@@ -1,0 +1,13 @@
+(library
+ (name capstone)
+ (modules capstone)
+ (foreign_stubs 
+  (language c) 
+  (names capstone_wrapper))
+ (c_library_flags -lcapstone)
+ )
+
+(test
+ (name test_chasm)
+ (modules test_chasm)
+ (libraries chasm capstone))

@@ -1,0 +1,5 @@
+(library
+ (name chasm)
+ (public_name chasm)
+ (modules chasm chasm_types)
+ (modules_without_implementation chasm_types))
