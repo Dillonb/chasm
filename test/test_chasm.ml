@@ -5,6 +5,7 @@ let bytes_to_hex_string bytes =
     String.concat " " (Bytes.fold_right fold_fn bytes [])
 
 let push_testcases = [
+  (* push 16 bit regs *)
   (push ax),   "push ax";
   (push cx),   "push cx";
   (push dx),   "push dx";
@@ -22,6 +23,7 @@ let push_testcases = [
   (push r14w), "push r14w";
   (push r15w), "push r15w";
 
+  (* push 64 bit regs *)
   (push rax), "push rax";
   (push rcx), "push rcx";
   (push rdx), "push rdx";
@@ -38,13 +40,23 @@ let push_testcases = [
   (push r13), "push r13";
   (push r14), "push r14";
   (push r15), "push r15";
+
+  (* push immediates *)
+  (push (imm8 0x12)), "push 0x12";
+  (push (imm8 (-1))), "push -1";
+  (push (imm16 (0xFFFF))), "push 0xffff";
+  (push (imm16 (0x1234))), "push 0x1234";
+  (push (imm16 (0x1000))), "push 0x1000";
+  (push (imm32 (0xFFFFFFFF))), "push -1";
+  (push (imm32 (0x12345678))), "push 0x12345678";
+  (push (imm32 (0x10000000))), "push 0x10000000";
 ]
 
 let print_failure asm expected actual =
           print_endline (Printf.sprintf "%s FAILED! Assembled to %s:" expected (bytes_to_hex_string asm));
           print_endline (Printf.sprintf "Which disassembles to: %s" actual);
           raise (Failure "Failed test case!")
-  
+
 let rec validate_testcases = function
   | [] -> ()
   | (instruction, expected_mnemonic) :: remaining ->

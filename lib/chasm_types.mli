@@ -8,15 +8,13 @@ type r64 = | Rax | Rcx | Rdx | Rbx | Rsi | Rdi | Rsp | Rbp | R8 | R9 | R10 | R11
 
 type memory = | M8 | M16 | M32 | M64
 
-type immediate =
-    | Imm8 of int
-    | Imm16 of int
-    | Imm32 of int32
-    | Imm64 of int64
+type immediate_8 = int
+type immediate_16 = int
+type immediate_32 = int
+type immediate_64 = int64
 
 type register = [ `r8 of r8 | `r16 of r16 | `r32 of r32 | `r64 of r64 ]
 
-type r16_r64_or_memory = [ `r16 of r16 | `r64 of r64 | `mem of memory ]
-
+type push_type = [ `r16 of r16 | `r64 of r64 | `mem of memory | `imm8 of immediate_8 | `imm16 of immediate_16 | `imm32 of immediate_32 ]
 type instruction =
-    | Push of r16_r64_or_memory
+    | Push of push_type

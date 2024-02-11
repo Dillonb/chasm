@@ -74,8 +74,12 @@ val rw: int -> [> `r16 of r16]
 val rd: int -> [> `r32 of r32]
 val rq: int -> [> `r64 of r64]
 
+val imm8:  immediate_8  -> [> `imm8 of immediate_8]
+val imm16: immediate_16 -> [> `imm16 of immediate_16]
+val imm32: immediate_32 -> [> `imm32 of immediate_32]
+val imm64: immediate_64 -> [> `imm64 of immediate_64]
 
-val push: r16_r64_or_memory -> instruction
+val push: push_type -> instruction
 
 val assemble: instruction -> bytes
 val assemble_list: instruction list -> bytes
