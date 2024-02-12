@@ -15,7 +15,7 @@
  (name chasm)
  (synopsis "x64 assembler")
  (description "x64 assembler intended to be used at runtime")
- (depends ocaml dune)
+ (depends ocaml dune stdint)
  )
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project

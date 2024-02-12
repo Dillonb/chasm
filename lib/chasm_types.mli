@@ -1,3 +1,5 @@
+open Stdint
+
 type r8 = | Al | Cl | Dl | Bl | Sil | Dil | Spl | Bpl | R8b | R9b | R10b | R11b | R12b | R13b | R14b | R15b
 
 type r16 = | Ax | Cx | Dx | Bx | Si | Di | Sp | Bp | R8w | R9w | R10w | R11w | R12w | R13w | R14w | R15w
@@ -8,13 +10,8 @@ type r64 = | Rax | Rcx | Rdx | Rbx | Rsi | Rdi | Rsp | Rbp | R8 | R9 | R10 | R11
 
 type memory = | M8 | M16 | M32 | M64
 
-type immediate_8 = int
-type immediate_16 = int
-type immediate_32 = int
-type immediate_64 = int64
-
 type register = [ `r8 of r8 | `r16 of r16 | `r32 of r32 | `r64 of r64 ]
 
-type push_type = [ `r16 of r16 | `r64 of r64 | `mem of memory | `imm8 of immediate_8 | `imm16 of immediate_16 | `imm32 of immediate_32 ]
+type push_type = [ `r16 of r16 | `r64 of r64 | `mem of memory | `imm8 of int8 | `imm16 of int16 | `imm32 of int32 | `imm of int ]
 type instruction =
     | Push of push_type

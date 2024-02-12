@@ -1,4 +1,5 @@
 open Chasm_types
+open Stdint
 
 let al   = `r8 Al
 let cl   = `r8 Cl
@@ -108,20 +109,45 @@ let rq_to_int = function
   | `r64 Rax ->  0 | `r64 Rcx ->  1 | `r64 Rdx ->  2 | `r64 Rbx ->  3 | `r64 Rsp ->  4 | `r64 Rbp ->  5 | `r64 Rsi ->  6 | `r64 Rdi ->  7
   | `r64 R8  ->  8 | `r64 R9  ->  9 | `r64 R10 -> 10 | `r64 R11 -> 11 | `r64 R12 -> 12 | `r64 R13 -> 13 | `r64 R14 -> 14 | `r64 R15 -> 15
 
+let imm   x = `imm x
 let imm8  x = `imm8 x
+let imm8_i x = imm8 (Int8.of_int x)
 let imm16 x = `imm16 x
+let imm16_i x = imm16 (Int16.of_int x)
 let imm32 x = `imm32 x
+let imm32_i x = imm32 (Int32.of_int x)
 let imm64 x = `imm64 x
 
-let list_of_int16_le x = [ x land 0xFF; (x lsr 8) land 0xFF; ]
-let list_of_int32_le x = [ x land 0xFF; (x lsr 8) land 0xFF; (x lsr 16) land 0xFF; (x lsr 24) land 0xFF ]
+let is_int8 x = 
+  let min = Int8.to_int Int8.min_int in 
+  let max = Int8.to_int Int8.max_int in 
+    ((x >= min) && (x <= max))
+
+let is_int16 x = 
+  let min = Int16.to_int Int16.min_int in 
+  let max = Int16.to_int Int16.max_int in 
+    ((x >= min) && (x <= max))
+let is_int32 x = 
+  let min = Int32.to_int Int32.min_int in 
+  let max = Int32.to_int Int32.max_int in 
+    ((x >= min) && (x <= max))
+
+let int_to_sized_imm = function
+  | x when is_int8 x  -> `imm8 (Int8.of_int x)
+  | x when is_int16 x -> `imm16 (Int16.of_int x)
+  | x when is_int32 x -> `imm32 (Int32.of_int x)
+  | _ -> raise (Invalid_argument "Int either too large or too small to represent in an immediate!")
+
+
+let list_of_int16_le x = let x = Int16.to_int x in [ x land 0xFF; (x lsr 8) land 0xFF; ]
+let list_of_int32_le x = let x = Int32.to_int x in [ x land 0xFF; (x lsr 8) land 0xFF; (x lsr 16) land 0xFF; (x lsr 24) land 0xFF ]
 
 let push x = Push x
 
 let make_bytes l = let b = Bytes.create (List.length l) in
   List.iteri (fun i v -> Bytes.set_uint8 b i v) l; b
 
-let assemble = function
+let rec assemble = function
   | Push (`r16 r)   -> let reg_num = rw_to_int(`r16 r) in
                         if (reg_num < 8) then
                           make_bytes ([0x66; 0x50 + (rw_to_int (`r16 r))])
@@ -132,10 +158,11 @@ let assemble = function
                           make_bytes [0x50 + reg_num]
                         else
                           make_bytes [0x41; 0x50 + (reg_num - 8)]
-  | Push (`imm8  i) -> make_bytes [0x6A; i]
+  | Push (`imm8  i) -> make_bytes [0x6A; Int8.to_int i]
   | Push (`imm16 i) -> make_bytes ([0x66; 0x68] @ (list_of_int16_le i))
   | Push (`imm32 i) -> make_bytes (0x68 :: (list_of_int32_le i))
-  | Push (`mem   _) -> raise (Invalid_argument "todo: push mem")
+  | Push (`imm i)   -> assemble (Push (int_to_sized_imm i))
+  | Push (`mem _)   -> raise (Invalid_argument "todo: push mem")
 
 let assemble_list instrs = let asm = List.map assemble instrs in
   Bytes.concat Bytes.empty asm

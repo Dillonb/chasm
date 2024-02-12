@@ -1,4 +1,5 @@
 open Chasm_types
+open Stdint
 
 val al:   [> `r8 of r8]
 val cl:   [> `r8 of r8]
@@ -68,16 +69,19 @@ val r13: [> `r64 of r64]
 val r14: [> `r64 of r64]
 val r15: [> `r64 of r64]
 
-
 val rb: int -> [> `r8 of r8]
 val rw: int -> [> `r16 of r16]
 val rd: int -> [> `r32 of r32]
 val rq: int -> [> `r64 of r64]
 
-val imm8:  immediate_8  -> [> `imm8 of immediate_8]
-val imm16: immediate_16 -> [> `imm16 of immediate_16]
-val imm32: immediate_32 -> [> `imm32 of immediate_32]
-val imm64: immediate_64 -> [> `imm64 of immediate_64]
+val imm:   int   -> [> `imm of int]
+val imm8:  int8  -> [> `imm8 of int8]
+val imm8_i: int  -> [> `imm8 of int8]
+val imm16: int16 -> [> `imm16 of int16]
+val imm16_i: int -> [> `imm16 of int16]
+val imm32: int32 -> [> `imm32 of int32]
+val imm32_i: int -> [> `imm32 of int32]
+val imm64: int64 -> [> `imm64 of int64]
 
 val push: push_type -> instruction
 

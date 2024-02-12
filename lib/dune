@@ -2,4 +2,5 @@
  (name chasm)
  (public_name chasm)
  (modules chasm chasm_types)
+ (libraries stdint)
  (modules_without_implementation chasm_types))

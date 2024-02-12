@@ -9,6 +9,7 @@ bug-reports: "https://github.com/Dillonb/chasm/issues"
 depends: [
   "ocaml"
   "dune" {>= "3.13"}
+  "stdint"
   "odoc" {with-doc}
 ]
 build: [
