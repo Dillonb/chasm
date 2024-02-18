@@ -80,6 +80,9 @@ let push_testcases = [
   (push (imm (-32769))), "push -0x8001"; (* int16 min - 1, should assemble as an imm32 *)
   (push (imm 32767)), "push 0x7fff"; (* int16 max *)
   (push (imm 32768)), "push 0x8000"; (* int16 max + 1, should assemble as an imm32 *)
+
+  (push (qword_ptr rax)#build),                "push qword [rax]";
+  (push ((qword_ptr rax)#plus_reg rcx)#build), "push qword [rax + rcx]";
 ]
 
 let print_failure asm expected actual =

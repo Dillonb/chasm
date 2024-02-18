@@ -83,6 +83,25 @@ val imm32: int32 -> [> `imm32 of int32]
 val imm32_i: int -> [> `imm32 of int32]
 val imm64: int64 -> [> `imm64 of int64]
 
+class mem_op_base_plus_reg :
+  r64 * r64 ->
+object
+  method build : [> `modrm of modrm ]
+end
+
+class mem_op_base : r64 -> object
+  method build : [> `modrm of modrm ]
+
+  method plus_reg :
+    [ `r64 of r64 ] -> mem_op_base_plus_reg
+end
+
+class mem_op : object
+    method base : r64 -> mem_op_base
+end
+
+val qword_ptr: [< `r64 of r64 ] -> mem_op_base
+
 val push: push_type -> instruction
 
 val assemble: instruction -> bytes

@@ -162,7 +162,27 @@ let rec assemble = function
   | Push (`imm16 i) -> make_bytes ([0x66; 0x68] @ (list_of_int16_le i))
   | Push (`imm32 i) -> make_bytes (0x68 :: (list_of_int32_le i))
   | Push (`imm i)   -> assemble (Push (int_to_sized_imm i))
-  | Push (`mem _)   -> raise (Invalid_argument "todo: push mem")
+  | Push (`modrm _) -> raise (Invalid_argument "todo: push modrm")
+
 
 let assemble_list instrs = let asm = List.map assemble instrs in
   Bytes.concat Bytes.empty asm
+
+class mem_op_base_plus_reg (base_reg, ofs_reg) = object
+  val base = base_reg
+  val ofs = ofs_reg
+  method build : 'a. [> `modrm of modrm ] as 'a = `modrm (R64PlusR64 (base, ofs))
+end
+
+class mem_op_base base_reg = object
+  method build : 'a. [> `modrm of modrm ] as 'a = `modrm (SingleR64 base_reg)
+  method plus_reg (r: [> `r64 of r64 ]) = match r with 
+    | `r64 r -> new mem_op_base_plus_reg (base_reg, r)
+end
+
+class mem_op = object
+  method base reg = new mem_op_base reg
+end
+
+let qword_ptr = function
+  | `r64 r -> ((new mem_op)#base(r))
