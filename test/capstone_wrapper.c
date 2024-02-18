@@ -29,5 +29,4 @@ value disassemble(value code, value length) {
     } else {
         caml_failwith("Disassembling multiple instructions not supported");
     }
-    return caml_copy_string("hello");
 }
