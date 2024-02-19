@@ -99,17 +99,18 @@ let push_indirect_r64_plus_r64_testcases =
       "push qword ptr [" ^ (rq_to_str reg1) ^ " + " ^ (rq_to_str reg2) ^ "]") 
     registers_64
 
-let has_failure = ref false
+let num_failures = ref 0
+let inc_failures () = num_failures := !num_failures + 1
 let print_failure asm expected actual =
           print_endline (Printf.sprintf "%s FAILED! Assembled to %s - which disassembles to %s" expected (bytes_to_hex_string asm) actual);
-          has_failure := true
+          inc_failures ()
 
 let safe_assemble instruction =
   try Ok(assemble instruction) with
-  | ex -> has_failure := true; Error ex
+  | ex -> inc_failures (); Error ex
 let safe_disassemble asm = 
   try Ok(Capstone.disassemble asm) with
-  | ex -> has_failure := true; Error ex
+  | ex -> inc_failures (); Error ex
 
 let rec validate_testcases = function
   | [] -> ()
@@ -132,4 +133,4 @@ validate_testcases push_r64_testcases;
 validate_testcases push_indirect_r64_testcases;
 validate_testcases push_indirect_r64_plus_r64_testcases;
 
-if (!has_failure) then raise (Failure "Failed one or more test cases!") else ()
+if (!num_failures > 0) then raise (Failure (Printf.sprintf "Failed %d test case%s!" !num_failures (if !num_failures == 1 then "" else "s"))) else ()
