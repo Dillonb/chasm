@@ -102,7 +102,9 @@ let push_indirect_r64_plus_r64_testcases =
     registers_64
 
 let num_failures = ref 0
+let num_success = ref 0
 let inc_failures () = num_failures := !num_failures + 1
+let inc_success () = num_success := !num_success + 1
 let print_failure asm expected actual =
           print_endline (Printf.sprintf "%s FAILED! Assembled to %s - which disassembles to %s" expected (bytes_to_hex_string asm) actual);
           inc_failures ()
@@ -120,7 +122,7 @@ let rec validate_testcases = function
     let _ = match safe_assemble instruction with
     | Ok asm -> (
       match safe_disassemble asm with
-      | Ok(disassembly) when (disassembly = expected_mnemonic) -> if print_success then print_endline (Printf.sprintf "%s OK!\t%s" expected_mnemonic (bytes_to_hex_string asm)) else ()
+      | Ok(disassembly) when (disassembly = expected_mnemonic) -> inc_success (); if print_success then print_endline (Printf.sprintf "%s OK!\t%s" expected_mnemonic (bytes_to_hex_string asm)) else ()
       | Ok(disassembly) -> print_failure asm expected_mnemonic disassembly
       | Error ex -> Printf.printf "%s Failed to disassemble with exception: %s\n" expected_mnemonic (Printexc.to_string ex)
     )
@@ -133,5 +135,5 @@ validate_testcases push_r16_testcases;
 validate_testcases push_r64_testcases;
 validate_testcases push_indirect_r64_testcases;
 validate_testcases push_indirect_r64_plus_r64_testcases;
-
+Printf.printf "Passed %d testcases!\n" !num_success;
 if (!num_failures > 0) then raise (Failure (Printf.sprintf "Failed %d test case%s!" !num_failures (if !num_failures == 1 then "" else "s"))) else ()
