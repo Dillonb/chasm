@@ -109,7 +109,7 @@ let rec assemble_push_mem = function
       let rex = make_rex_b reg_num in
         let sib = if (((reg_num land 7) == 4)) then Some 0x24 else None in (* rsp/r12 need SIB byte *)
           let modbits, offset = if ((reg_num land 7) == 5) then (1, Some 0) else (0, None) in (* using the base pointer (or r13) requires an offset *)
-            make_bytes (rex +? ([0xFF; (make_modrm modbits 6 reg_num)] @? sib) @? offset)
+            make_bytes (rex +? ([0xFF; make_modrm modbits 6 reg_num] @? sib) @? offset)
 
   (* rsp is invalid in the index field, so quietly swap it to base if possible *)
   | R64BasePlusIndex (base, index) when base != Rsp && index = Rsp -> assemble_push_mem(R64BasePlusIndex(index, base))
@@ -117,7 +117,8 @@ let rec assemble_push_mem = function
   | R64BasePlusIndex (base, index) -> 
     let base_num, index_num = rq_to_int (`r64 base), rq_to_int(`r64 index) in
       let rex = make_rex_bx base_num index_num in
-        make_bytes (rex +? [0xFF; 0x34; make_sib 0 index_num base_num])
+          let modbits, offset = if ((base_num land 7) == 5) then (1, Some 0) else (0, None) in (* using the base pointer (or r13) requires an offset *)
+            make_bytes (rex +? [0xFF; make_modrm modbits 6 4; make_sib 0 index_num base_num] @? offset)
 
 let rec assemble = function
   | Push (`r16 r)   -> let reg_num = rw_to_int(`r16 r) in
