@@ -2,6 +2,8 @@ open Chasm
 open Chasm__Chasm_types
 open Stdint
 
+let print_success = false
+
 let bytes_to_hex_string bytes = 
   let fold_fn c s = Printf.sprintf "%02X" (int_of_char c) :: s in
     String.concat " " (Bytes.fold_right fold_fn bytes [])
@@ -115,15 +117,14 @@ let safe_disassemble asm =
 let rec validate_testcases = function
   | [] -> ()
   | (instruction, expected_mnemonic) :: remaining ->
-    Printf.printf "%s " expected_mnemonic;
     let _ = match safe_assemble instruction with
     | Ok asm -> (
       match safe_disassemble asm with
-      | Ok(disassembly) when (disassembly = expected_mnemonic) -> print_endline (Printf.sprintf "OK!\t%s" (bytes_to_hex_string asm))
+      | Ok(disassembly) when (disassembly = expected_mnemonic) -> if print_success then print_endline (Printf.sprintf "%s OK!\t%s" expected_mnemonic (bytes_to_hex_string asm)) else ()
       | Ok(disassembly) -> print_failure asm expected_mnemonic disassembly
-      | Error ex -> Printf.printf "Failed to disassemble with exception: %s\n" (Printexc.to_string ex)
+      | Error ex -> Printf.printf "%s Failed to disassemble with exception: %s\n" expected_mnemonic (Printexc.to_string ex)
     )
-    | Error ex -> Printf.printf "Failed to assemble with exception: %s\n" (Printexc.to_string ex)
+    | Error ex -> Printf.printf "%s Failed to assemble with exception: %s\n" expected_mnemonic (Printexc.to_string ex)
     in validate_testcases remaining
 
 let () = 
