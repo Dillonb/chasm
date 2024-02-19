@@ -8,11 +8,11 @@ type r32 = | Eax | Ecx | Edx | Ebx | Esi | Edi | Esp | Ebp | R8d | R9d | R10d | 
 
 type r64 = | Rax | Rcx | Rdx | Rbx | Rsi | Rdi | Rsp | Rbp | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15
 
+type register = [ `r8 of r8 | `r16 of r16 | `r32 of r32 | `r64 of r64 ]
+
 type modrm =
     | SingleR64 of r64
     | R64PlusR64 of r64 * r64
-
-type register = [ `r8 of r8 | `r16 of r16 | `r32 of r32 | `r64 of r64 ]
 
 type push_type = [ `r16 of r16 | `r64 of r64 
                  | `modrm of modrm
