@@ -124,7 +124,7 @@ let rec validate_testcases = function
       match safe_disassemble asm with
       | Ok(disassembly) when (disassembly = expected_mnemonic) -> inc_success (); if print_success then print_endline (Printf.sprintf "%s OK!\t%s" expected_mnemonic (bytes_to_hex_string asm)) else ()
       | Ok(disassembly) -> print_failure asm expected_mnemonic disassembly
-      | Error ex -> Printf.printf "%s Failed to disassemble with exception: %s\n" expected_mnemonic (Printexc.to_string ex)
+      | Error ex -> Printf.printf "%s assembled to %s - Failed to disassemble with exception: %s\n" expected_mnemonic (bytes_to_hex_string asm) (Printexc.to_string ex)
     )
     | Error ex -> Printf.printf "%s Failed to assemble with exception: %s\n" expected_mnemonic (Printexc.to_string ex)
     in validate_testcases remaining
