@@ -96,7 +96,7 @@ let push_r64_testcases = List.map (fun reg -> (push reg), "push " ^ (rq_to_str r
 let push_r16_testcases = List.map (fun reg -> (push reg), "push " ^ (rw_to_str reg)) registers_16
 let push_indirect_r64_testcases = List.map (fun reg -> (push (qword_ptr reg)#build), "push qword ptr [" ^ (rq_to_str reg) ^ "]") registers_64
 let push_indirect_r64_plus_r64_testcases =
-  map_all_combinations (fun reg1 reg2 -> let ins = (push (qword_ptr reg1 ++ reg2)#build) in
+  map_all_combinations (fun reg1 reg2 -> let ins = (push (qword_ptr reg1 |+ reg2)#build) in
    match reg1, reg2 with
     (* rsp is invalid in the index field, so expect the assembler to quietly swap r1 and r2*)
     | base, index when base != rsp && index = rsp -> ins, "push qword ptr [rsp + " ^ (rq_to_str base) ^ "]"
@@ -105,6 +105,27 @@ let push_indirect_r64_plus_r64_testcases =
     (* normal case*)
     | reg1, reg2 -> ins, "push qword ptr [" ^ (rq_to_str reg1) ^ " + " ^ (rq_to_str reg2) ^ "]") 
     registers_64
+
+let is_valid_scale scale = scale == 1 || scale == 2 || scale == 4 || scale == 8
+
+let push_indirect_r64_plus_r64_times_scale_testcases = List.concat_map (
+  fun scale -> map_all_combinations (
+    fun base index ->
+      let ins = (push (qword_ptr base |+ index |* scale)#build) in
+      match base, index, scale with
+      (* rsp is invalid in the index field, so expect the assembler to quietly swap r1 and r2*)
+      | base, index, scale when base != rsp && index = rsp && scale = 1 -> ins, "push qword ptr [rsp + " ^ (rq_to_str base) ^ "]"
+      (* when rsp is in both fields, nothing we can do to fix it, so expect it to fail *)
+      | base, index, scale when base = rsp && index = rsp -> ins, "push qword ptr [rsp + rsp*" ^ (string_of_int scale) ^"] *INVALID*"
+      (* when rsp is in the index field and a scaling factor is used, nothing we can do to fix it, so expect it to fail *)
+      | base, index, scale when index = rsp && scale != 1 -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + rsp*" ^ (string_of_int scale) ^"] *INVALID*"
+
+      (* invalid test invalid scale values *)
+      | base, index, scale when not (is_valid_scale scale) -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + " ^ (rq_to_str index) ^ "*" ^ (string_of_int scale) ^"] *INVALID*"
+
+      | base, index, scale when scale = 1 -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + " ^ (rq_to_str index) ^ "]"
+      | base, index, scale -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + " ^ (rq_to_str index) ^ "*" ^ (string_of_int scale) ^"]"
+    ) registers_64) [-1; 0; 1; 2; 3; 4; 5; 6; 7; 8; 9; ]
 
 let num_failures = ref 0
 let num_success = ref 0
@@ -131,11 +152,12 @@ let rec validate_testcases = function
     | Error ex -> Printf.printf "%s Failed to assemble with exception: %s\n" expected_mnemonic (Printexc.to_string ex); inc_failures ()
     in validate_testcases remaining
 
-let () = 
+let () =
 validate_testcases push_imm_testcases;
 validate_testcases push_r16_testcases;
 validate_testcases push_r64_testcases;
 validate_testcases push_indirect_r64_testcases;
 validate_testcases push_indirect_r64_plus_r64_testcases;
+validate_testcases push_indirect_r64_plus_r64_times_scale_testcases;
 Printf.printf "Passed %d testcases!\n" !num_success;
 if (!num_failures > 0) then raise (Failure (Printf.sprintf "Failed %d test case%s!" !num_failures (if !num_failures == 1 then "" else "s"))) else ()

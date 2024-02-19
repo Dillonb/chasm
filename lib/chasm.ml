@@ -103,22 +103,36 @@ let push x = Push x
 
 exception Invalid_encoding of string
 
+let get_scale_bits = function
+  | 1 -> 0
+  | 2 -> 1
+  | 4 -> 2
+  | 8 -> 3
+  | _ -> raise (Invalid_encoding "The only valid values for scale are: 1, 2, 4, 8")
+
 let rec assemble_push_mem = function
-  | R64Base r -> 
-    let reg_num = rq_to_int (`r64 r) in 
+  | R64Base r ->
+    let reg_num = rq_to_int (`r64 r) in
       let rex = make_rex_b reg_num in
         let sib = if (((reg_num land 7) == 4)) then Some 0x24 else None in (* rsp/r12 need SIB byte *)
           let modbits, offset = if ((reg_num land 7) == 5) then (1, Some 0) else (0, None) in (* using the base pointer (or r13) requires an offset *)
             make_bytes (rex +? ([0xFF; make_modrm modbits 6 reg_num] @? sib) @? offset)
 
+  (* this form is just the base index scale form with a scale of 1 *)
+  | R64BasePlusIndex (base, index) -> assemble_push_mem (R64BasePlusIndexTimesScale(base, index, 1))
+
   (* rsp is invalid in the index field, so quietly swap it to base if possible *)
-  | R64BasePlusIndex (base, index) when base != Rsp && index = Rsp -> assemble_push_mem(R64BasePlusIndex(index, base))
-  | R64BasePlusIndex (base, index) when base = Rsp && index = Rsp -> raise (Invalid_encoding "RSP is not valid in the index field (the base field is also RSP so they cannot be swapped)")
-  | R64BasePlusIndex (base, index) -> 
+  | R64BasePlusIndexTimesScale (base, index, scale) when base != Rsp && index = Rsp && scale = 1 -> assemble_push_mem(R64BasePlusIndex(index, base))
+  (* can't swap if there's a scale value *)
+  | R64BasePlusIndexTimesScale (_, index, scale) when index = Rsp && scale != 1 -> raise (Invalid_encoding "RSP is not valid in the index field (a scaling factor was used, so it cannot be swapped with the base field)")
+  (* can't swap if base is also rsp *)
+  | R64BasePlusIndexTimesScale (base, index, _) when base = Rsp && index = Rsp -> raise (Invalid_encoding "RSP is not valid in the index field (the base field is also RSP so they cannot be swapped)")
+
+  | R64BasePlusIndexTimesScale (base, index, scale) ->
     let base_num, index_num = rq_to_int (`r64 base), rq_to_int(`r64 index) in
       let rex = make_rex_bx base_num index_num in
           let modbits, offset = if ((base_num land 7) == 5) then (1, Some 0) else (0, None) in (* using the base pointer (or r13) requires an offset *)
-            make_bytes (rex +? [0xFF; make_modrm modbits 6 4; make_sib 0 index_num base_num] @? offset)
+            make_bytes (rex +? [0xFF; make_modrm modbits 6 4; make_sib (get_scale_bits scale) index_num base_num] @? offset)
 
 let rec assemble = function
   | Push (`r16 r)   -> let reg_num = rw_to_int(`r16 r) in
@@ -138,19 +152,25 @@ let rec assemble = function
 let assemble_list instrs = let asm = List.map assemble instrs in
   Bytes.concat Bytes.empty asm
 
-class mem_op_base_plus_reg (base_reg, ofs_reg) = object
+class mem_op_base_plus_ofs_times_scale (base, ofs, scale) = object
+  method build : 'a. [> `mem of mem ] as 'a = `mem (R64BasePlusIndexTimesScale (base, ofs, scale))
+end
+
+class mem_op_base_plus_ofs (base_reg, ofs_reg) = object
   val base = base_reg
   val ofs = ofs_reg
+  method times_scale (scale : int) = (new mem_op_base_plus_ofs_times_scale (base, ofs, scale))
   method build : 'a. [> `mem of mem ] as 'a = `mem (R64BasePlusIndex (base, ofs))
 end
 
 class mem_op_base base_reg = object
   method build : 'a. [> `mem of mem ] as 'a = `mem (R64Base base_reg)
-  method plus_reg (r: [> `r64 of r64 ]) = match r with 
-    | `r64 r -> new mem_op_base_plus_reg (base_reg, r)
+  method plus_reg (r: [> `r64 of r64 ]) = match r with
+    | `r64 r -> new mem_op_base_plus_ofs (base_reg, r)
 end
 
-let (++) (op : mem_op_base) (r: [> `r64 of r64 ]) = op#plus_reg(r)
+let (|+) (op : mem_op_base) (r: [> `r64 of r64 ]) = op#plus_reg(r)
+let (|*) (op : mem_op_base_plus_ofs) scale = op#times_scale(scale)
 
 class mem_op = object
   method base reg = new mem_op_base reg

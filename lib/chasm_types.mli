@@ -13,6 +13,7 @@ type register = [ `r8 of r8 | `r16 of r16 | `r32 of r32 | `r64 of r64 ]
 type mem =
     | R64Base of r64
     | R64BasePlusIndex of r64 * r64
+    | R64BasePlusIndexTimesScale of r64 * r64 * int
 
 type push_type = [ `r16 of r16 | `r64 of r64 
                  | `mem of mem
