@@ -103,8 +103,8 @@ let push x = Push x
 
 exception Invalid_encoding of string
 
-let rec assemble_push_modrm = function
-  | SingleR64 r -> 
+let rec assemble_push_mem = function
+  | R64Base r -> 
     let reg_num = rq_to_int (`r64 r) in 
       let rex = make_rex_b reg_num in
         let sib = if (((reg_num land 7) == 4)) then Some 0x24 else None in (* rsp/r12 need SIB byte *)
@@ -112,9 +112,9 @@ let rec assemble_push_modrm = function
             make_bytes (rex +? ([0xFF; (make_modrm modbits 6 reg_num)] @? sib) @? offset)
 
   (* rsp is invalid in the index field, so quietly swap it to base if possible *)
-  | R64PlusR64 (base, index) when base != Rsp && index = Rsp -> assemble_push_modrm(R64PlusR64(index, base))
-  | R64PlusR64 (base, index) when base = Rsp && index = Rsp -> raise (Invalid_encoding "RSP is not valid in the index field (the base field is also RSP so they cannot be swapped)")
-  | R64PlusR64 (base, index) -> 
+  | R64BasePlusIndex (base, index) when base != Rsp && index = Rsp -> assemble_push_mem(R64BasePlusIndex(index, base))
+  | R64BasePlusIndex (base, index) when base = Rsp && index = Rsp -> raise (Invalid_encoding "RSP is not valid in the index field (the base field is also RSP so they cannot be swapped)")
+  | R64BasePlusIndex (base, index) -> 
     let base_num, index_num = rq_to_int (`r64 base), rq_to_int(`r64 index) in
       let rex = make_rex_bx base_num index_num in
         make_bytes (rex +? [0xFF; 0x34; make_sib 0 index_num base_num])
@@ -132,7 +132,7 @@ let rec assemble = function
   | Push (`imm16 i) -> make_bytes ([0x66; 0x68] @ (list_of_int16_le i))
   | Push (`imm32 i) -> make_bytes (0x68 :: (list_of_int32_le i))
   | Push (`imm i)   -> assemble (Push (int_to_sized_imm i))
-  | Push (`modrm m) -> assemble_push_modrm m
+  | Push (`mem m) -> assemble_push_mem m
 
 let assemble_list instrs = let asm = List.map assemble instrs in
   Bytes.concat Bytes.empty asm
@@ -140,11 +140,11 @@ let assemble_list instrs = let asm = List.map assemble instrs in
 class mem_op_base_plus_reg (base_reg, ofs_reg) = object
   val base = base_reg
   val ofs = ofs_reg
-  method build : 'a. [> `modrm of modrm ] as 'a = `modrm (R64PlusR64 (base, ofs))
+  method build : 'a. [> `mem of mem ] as 'a = `mem (R64BasePlusIndex (base, ofs))
 end
 
 class mem_op_base base_reg = object
-  method build : 'a. [> `modrm of modrm ] as 'a = `modrm (SingleR64 base_reg)
+  method build : 'a. [> `mem of mem ] as 'a = `mem (R64Base base_reg)
   method plus_reg (r: [> `r64 of r64 ]) = match r with 
     | `r64 r -> new mem_op_base_plus_reg (base_reg, r)
 end

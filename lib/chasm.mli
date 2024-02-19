@@ -86,11 +86,11 @@ val imm64: int64 -> [> `imm64 of int64]
 class mem_op_base_plus_reg :
   r64 * r64 ->
 object
-  method build : [> `modrm of modrm ]
+  method build : [> `mem of mem ]
 end
 
 class mem_op_base : r64 -> object
-  method build : [> `modrm of modrm ]
+  method build : [> `mem of mem ]
 
   method plus_reg :
     [ `r64 of r64 ] -> mem_op_base_plus_reg
