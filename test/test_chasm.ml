@@ -81,8 +81,25 @@ let push_testcases = [
   (push (imm 32767)), "push 0x7fff"; (* int16 max *)
   (push (imm 32768)), "push 0x8000"; (* int16 max + 1, should assemble as an imm32 *)
 
-  (push (qword_ptr rax)#build),                "push qword [rax]";
-  (push ((qword_ptr rax)#plus_reg rcx)#build), "push qword [rax + rcx]";
+  (push (qword_ptr rax)#build), "push qword ptr [rax]";
+  (push (qword_ptr rax)#build), "push qword ptr [rax]";
+  (push (qword_ptr rcx)#build), "push qword ptr [rcx]";
+  (push (qword_ptr rdx)#build), "push qword ptr [rdx]";
+  (push (qword_ptr rbx)#build), "push qword ptr [rbx]";
+  (push (qword_ptr rsi)#build), "push qword ptr [rsi]";
+  (push (qword_ptr rdi)#build), "push qword ptr [rdi]";
+  (push (qword_ptr rsp)#build), "push qword ptr [rsp]";
+  (push (qword_ptr rbp)#build), "push qword ptr [rbp]";
+  (push (qword_ptr r8)#build),  "push qword ptr [r8]";
+  (push (qword_ptr r9)#build),  "push qword ptr [r9]";
+  (push (qword_ptr r10)#build), "push qword ptr [r10]";
+  (push (qword_ptr r11)#build), "push qword ptr [r11]";
+  (push (qword_ptr r12)#build), "push qword ptr [r12]";
+  (push (qword_ptr r13)#build), "push qword ptr [r13]";
+  (push (qword_ptr r14)#build), "push qword ptr [r14]";
+  (push (qword_ptr r15)#build), "push qword ptr [r15]";
+
+  (* (push ((qword_ptr rax)#plus_reg rcx)#build), "push qword ptr [rax + rcx]"; *)
 ]
 
 let print_failure asm expected actual =

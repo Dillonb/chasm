@@ -144,25 +144,55 @@ let list_of_int32_le x = let x = Int32.to_int x in [ x land 0xFF; (x lsr 8) land
 
 let push x = Push x
 
+let int_of_bool b = if b then 1 else 0
+let make_rex w r x b = 0x40 
+  lor ((int_of_bool w) lsl 3) 
+  lor ((int_of_bool r) lsl 2) 
+  lor (int_of_bool x lsl 1) 
+  lor (int_of_bool b)
+
+let rex_b = make_rex false false false true
+
 let make_bytes l = let b = Bytes.create (List.length l) in
   List.iteri (fun i v -> Bytes.set_uint8 b i v) l; b
 
+let make_modrm modbits reg rm =
+  ((modbits land 0b11) lsl 6) lor
+  ((reg land 0b111) lsl 3) lor
+  (rm land 0b111)
+
+let (+?) o l = match o with
+  | Some i -> i :: l
+  | None -> l
+
+let (@?) l o = match o with
+  | Some i -> l @ [i]
+  | None -> l
+
+let assemble_push_modrm = function
+  | SingleR64 r -> 
+    let reg_num = rq_to_int (`r64 r) in 
+      let rex = if (reg_num < 8) then None else Some rex_b in
+        let sib = if (((reg_num land 7) == 4)) then Some 0x24 else None in (* rsp/r12 need SIB byte *)
+          let modbits, offset = if ((reg_num land 7) == 5) then (1, Some 0) else (0, None) in (* using the base pointer (or r13) requires an offset *)
+            make_bytes (rex +? ([0xFF; (make_modrm modbits 6 reg_num)] @? sib) @? offset)
+
+  | R64PlusR64 (_, _) -> raise Not_found
+
 let rec assemble = function
   | Push (`r16 r)   -> let reg_num = rw_to_int(`r16 r) in
-                        if (reg_num < 8) then
-                          make_bytes ([0x66; 0x50 + (rw_to_int (`r16 r))])
-                        else
-                          make_bytes [0x66; 0x41; 0x50 + (reg_num - 8)]
+                        let rex = if (reg_num < 8) then None else Some rex_b in
+                          make_bytes (0x66 :: rex +? [0x50 + (reg_num land 7)])
+
   | Push (`r64 r)   -> let reg_num = rq_to_int(`r64 r) in
-                        if (reg_num < 8) then
-                          make_bytes [0x50 + reg_num]
-                        else
-                          make_bytes [0x41; 0x50 + (reg_num - 8)]
+                        let rex = if (reg_num < 8) then None else Some rex_b in
+                          make_bytes (rex +? [0x50 + (reg_num land 7)])
+
   | Push (`imm8  i) -> make_bytes [0x6A; Int8.to_int i]
   | Push (`imm16 i) -> make_bytes ([0x66; 0x68] @ (list_of_int16_le i))
   | Push (`imm32 i) -> make_bytes (0x68 :: (list_of_int32_le i))
   | Push (`imm i)   -> assemble (Push (int_to_sized_imm i))
-  | Push (`modrm _) -> raise (Invalid_argument "todo: push modrm")
+  | Push (`modrm m) -> assemble_push_modrm m
 
 
 let assemble_list instrs = let asm = List.map assemble instrs in
