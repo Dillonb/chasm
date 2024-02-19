@@ -51,7 +51,13 @@ let make_rex w r x b = let low_bits =
     ((int_of_bool r) lsl 2) lor
     (int_of_bool x lsl 1) lor
     (int_of_bool b) in
-  if (low_bits = 0) then Some (0x40 lor low_bits) else None
+  if (low_bits != 0) then Some (0x40 lor low_bits) else None
+
+let make_rex_bx base_num index_num =
+  let rex_bit_b, rex_bit_x = (base_num >= 8), (index_num >= 8) in
+    make_rex false false rex_bit_x rex_bit_b
+
+let make_rex_b reg_num = make_rex false false false (reg_num >= 8)
 
 let make_modrm modbits reg rm =
   ((modbits land 0b11) lsl 6) lor

@@ -101,12 +101,6 @@ let imm64 x = `imm64 x
 
 let push x = Push x
 
-let make_rex_bx base_num index_num =
-  let rex_bit_b, rex_bit_x = (base_num land 8) == 8, (index_num land 8) == 8 in
-    make_rex false false rex_bit_x rex_bit_b
-
-let make_rex_b reg_num = make_rex false false false ((reg_num land 8) == 8)
-
 let assemble_push_modrm = function
   | SingleR64 r -> 
     let reg_num = rq_to_int (`r64 r) in 
