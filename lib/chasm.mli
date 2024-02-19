@@ -106,5 +106,7 @@ val qword_ptr: [< `r64 of r64 ] -> mem_op_base
 
 val push: push_type -> instruction
 
+exception Invalid_encoding of string
+
 val assemble: instruction -> bytes
 val assemble_list: instruction list -> bytes

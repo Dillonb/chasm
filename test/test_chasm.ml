@@ -96,25 +96,26 @@ let push_r64_testcases = List.map (fun reg -> (push reg), "push " ^ (rq_to_str r
 let push_r16_testcases = List.map (fun reg -> (push reg), "push " ^ (rw_to_str reg)) registers_16
 let push_indirect_r64_testcases = List.map (fun reg -> (push (qword_ptr reg)#build), "push qword ptr [" ^ (rq_to_str reg) ^ "]") registers_64
 let push_indirect_r64_plus_r64_testcases =
-  map_all_combinations (fun reg1 reg2 -> 
-      (push (qword_ptr reg1 ++ reg2)#build), 
-      "push qword ptr [" ^ (rq_to_str reg1) ^ " + " ^ (rq_to_str reg2) ^ "]") 
+  map_all_combinations (fun reg1 reg2 -> let ins = (push (qword_ptr reg1 ++ reg2)#build) in
+   match reg1, reg2 with
+    (* rsp is invalid in the index field, so expect the assembler to quietly swap r1 and r2*)
+    | base, index when base != rsp && index = rsp -> ins, "push qword ptr [rsp + " ^ (rq_to_str base) ^ "]"
+    (* when rsp is in both fields, nothing we can do to fix it, so expect it to fail *)
+    | base, index when base = rsp && index = rsp -> ins, "push qword ptr [rsp + rsp] *INVALID*"
+    (* normal case*)
+    | reg1, reg2 -> ins, "push qword ptr [" ^ (rq_to_str reg1) ^ " + " ^ (rq_to_str reg2) ^ "]") 
     registers_64
 
 let num_failures = ref 0
 let num_success = ref 0
 let inc_failures () = num_failures := !num_failures + 1
 let inc_success () = num_success := !num_success + 1
-let print_failure asm expected actual =
-          print_endline (Printf.sprintf "%s FAILED! Assembled to %s - which disassembles to %s" expected (bytes_to_hex_string asm) actual);
-          inc_failures ()
-
 let safe_assemble instruction =
   try Ok(assemble instruction) with
-  | ex -> inc_failures (); Error ex
+  | ex -> Error ex
 let safe_disassemble asm = 
   try Ok(Capstone.disassemble asm) with
-  | ex -> inc_failures (); Error ex
+  | ex -> Error ex
 
 let rec validate_testcases = function
   | [] -> ()
@@ -122,11 +123,12 @@ let rec validate_testcases = function
     let _ = match safe_assemble instruction with
     | Ok asm -> (
       match safe_disassemble asm with
-      | Ok(disassembly) when (disassembly = expected_mnemonic) -> inc_success (); if print_success then print_endline (Printf.sprintf "%s OK!\t%s" expected_mnemonic (bytes_to_hex_string asm)) else ()
-      | Ok(disassembly) -> print_failure asm expected_mnemonic disassembly
-      | Error ex -> Printf.printf "%s assembled to %s - Failed to disassemble with exception: %s\n" expected_mnemonic (bytes_to_hex_string asm) (Printexc.to_string ex)
+      | Ok(disassembly) when (disassembly = expected_mnemonic) -> inc_success (); if print_success then Printf.printf "%s OK!\t%s\n" expected_mnemonic (bytes_to_hex_string asm) else ()
+      | Ok(disassembly) -> print_endline (Printf.sprintf "%s FAILED! Assembled to %s - which disassembles to %s" expected_mnemonic (bytes_to_hex_string asm) disassembly); inc_failures ()
+      | Error ex -> Printf.printf "%s assembled to %s - Failed to disassemble with exception: %s\n" expected_mnemonic (bytes_to_hex_string asm) (Printexc.to_string ex); inc_failures ()
     )
-    | Error ex -> Printf.printf "%s Failed to assemble with exception: %s\n" expected_mnemonic (Printexc.to_string ex)
+    | Error (Invalid_encoding _) when String.ends_with ~suffix:"*INVALID*" expected_mnemonic -> inc_success (); if print_success then Printf.printf "%s OK!\n" expected_mnemonic
+    | Error ex -> Printf.printf "%s Failed to assemble with exception: %s\n" expected_mnemonic (Printexc.to_string ex); inc_failures ()
     in validate_testcases remaining
 
 let () = 

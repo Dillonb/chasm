@@ -101,7 +101,9 @@ let imm64 x = `imm64 x
 
 let push x = Push x
 
-let assemble_push_modrm = function
+exception Invalid_encoding of string
+
+let rec assemble_push_modrm = function
   | SingleR64 r -> 
     let reg_num = rq_to_int (`r64 r) in 
       let rex = make_rex_b reg_num in
@@ -109,6 +111,9 @@ let assemble_push_modrm = function
           let modbits, offset = if ((reg_num land 7) == 5) then (1, Some 0) else (0, None) in (* using the base pointer (or r13) requires an offset *)
             make_bytes (rex +? ([0xFF; (make_modrm modbits 6 reg_num)] @? sib) @? offset)
 
+  (* rsp is invalid in the index field, so quietly swap it to base if possible *)
+  | R64PlusR64 (base, index) when base != Rsp && index = Rsp -> assemble_push_modrm(R64PlusR64(index, base))
+  | R64PlusR64 (base, index) when base = Rsp && index = Rsp -> raise (Invalid_encoding "RSP is not valid in the index field (the base field is also RSP so they cannot be swapped)")
   | R64PlusR64 (base, index) -> 
     let base_num, index_num = rq_to_int (`r64 base), rq_to_int(`r64 index) in
       let rex = make_rex_bx base_num index_num in
