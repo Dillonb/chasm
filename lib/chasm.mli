@@ -96,6 +96,8 @@ class mem_op_base : r64 -> object
     [ `r64 of r64 ] -> mem_op_base_plus_reg
 end
 
+val (++) : mem_op_base -> [ `r64 of r64] -> mem_op_base_plus_reg
+
 class mem_op : object
     method base : r64 -> mem_op_base
 end

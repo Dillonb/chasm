@@ -1,6 +1,6 @@
 (library
  (name chasm)
  (public_name chasm)
- (modules chasm chasm_types)
+ (modules chasm chasm_types chasm_util)
  (libraries stdint)
  (modules_without_implementation chasm_types))

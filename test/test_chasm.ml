@@ -1,47 +1,52 @@
 open Chasm
+open Chasm__Chasm_types
 open Stdint
 
 let bytes_to_hex_string bytes = 
   let fold_fn c s = Printf.sprintf "%02X" (int_of_char c) :: s in
     String.concat " " (Bytes.fold_right fold_fn bytes [])
 
-let push_testcases = [
-  (* push 16 bit regs *)
-  (push ax),   "push ax";
-  (push cx),   "push cx";
-  (push dx),   "push dx";
-  (push bx),   "push bx";
-  (push si),   "push si";
-  (push di),   "push di";
-  (push sp),   "push sp";
-  (push bp),   "push bp";
-  (push r8w),  "push r8w";
-  (push r9w),  "push r9w";
-  (push r10w), "push r10w";
-  (push r11w), "push r11w";
-  (push r12w), "push r12w";
-  (push r13w), "push r13w";
-  (push r14w), "push r14w";
-  (push r15w), "push r15w";
+let registers_16 = [ ax; cx; dx; bx; si; di; sp; bp; r8w; r9w; r10w; r11w; r12w; r13w; r14w; r15w ]
+let registers_64 = [ rax; rcx; rdx; rbx; rsi; rdi; rsp; rbp; r8; r9; r10; r11; r12; r13; r14; r15 ]
+let rq_to_str = function
+| `r64 Rax -> "rax"
+| `r64 Rcx -> "rcx"
+| `r64 Rdx -> "rdx"
+| `r64 Rbx -> "rbx"
+| `r64 Rsi -> "rsi"
+| `r64 Rdi -> "rdi"
+| `r64 Rsp -> "rsp"
+| `r64 Rbp -> "rbp"
+| `r64 R8  -> "r8"
+| `r64 R9  -> "r9"
+| `r64 R10 -> "r10"
+| `r64 R11 -> "r11"
+| `r64 R12 -> "r12"
+| `r64 R13 -> "r13"
+| `r64 R14 -> "r14"
+| `r64 R15 -> "r15"
+| _ -> raise (Invalid_argument "Unknown register passed!")
 
-  (* push 64 bit regs *)
-  (push rax), "push rax";
-  (push rcx), "push rcx";
-  (push rdx), "push rdx";
-  (push rbx), "push rbx";
-  (push rsi), "push rsi";
-  (push rdi), "push rdi";
-  (push rsp), "push rsp";
-  (push rbp), "push rbp";
-  (push r8),  "push r8";
-  (push r9),  "push r9";
-  (push r10), "push r10";
-  (push r11), "push r11";
-  (push r12), "push r12";
-  (push r13), "push r13";
-  (push r14), "push r14";
-  (push r15), "push r15";
+let rw_to_str = function
+| `r16 Ax -> "ax"
+| `r16 Cx -> "cx"
+| `r16 Dx -> "dx"
+| `r16 Bx -> "bx"
+| `r16 Si -> "si"
+| `r16 Di -> "di"
+| `r16 Sp -> "sp"
+| `r16 Bp -> "bp"
+| `r16 R8w  -> "r8w"
+| `r16 R9w  -> "r9w"
+| `r16 R10w -> "r10w"
+| `r16 R11w -> "r11w"
+| `r16 R12w -> "r12w"
+| `r16 R13w -> "r13w"
+| `r16 R14w -> "r14w"
+| `r16 R15w -> "r15w"
+| _ -> raise (Invalid_argument "Unknown register passed!")
 
+let push_imm_testcases = [
   (* push immediates *)
   (push (imm8 (Int8.of_int 0x12))), "push 0x12";
   (push (imm8 (Int8.of_int (-1)))), "push -1";
@@ -80,42 +85,51 @@ let push_testcases = [
   (push (imm (-32769))), "push -0x8001"; (* int16 min - 1, should assemble as an imm32 *)
   (push (imm 32767)), "push 0x7fff"; (* int16 max *)
   (push (imm 32768)), "push 0x8000"; (* int16 max + 1, should assemble as an imm32 *)
-
-  (push (qword_ptr rax)#build), "push qword ptr [rax]";
-  (push (qword_ptr rax)#build), "push qword ptr [rax]";
-  (push (qword_ptr rcx)#build), "push qword ptr [rcx]";
-  (push (qword_ptr rdx)#build), "push qword ptr [rdx]";
-  (push (qword_ptr rbx)#build), "push qword ptr [rbx]";
-  (push (qword_ptr rsi)#build), "push qword ptr [rsi]";
-  (push (qword_ptr rdi)#build), "push qword ptr [rdi]";
-  (push (qword_ptr rsp)#build), "push qword ptr [rsp]";
-  (push (qword_ptr rbp)#build), "push qword ptr [rbp]";
-  (push (qword_ptr r8)#build),  "push qword ptr [r8]";
-  (push (qword_ptr r9)#build),  "push qword ptr [r9]";
-  (push (qword_ptr r10)#build), "push qword ptr [r10]";
-  (push (qword_ptr r11)#build), "push qword ptr [r11]";
-  (push (qword_ptr r12)#build), "push qword ptr [r12]";
-  (push (qword_ptr r13)#build), "push qword ptr [r13]";
-  (push (qword_ptr r14)#build), "push qword ptr [r14]";
-  (push (qword_ptr r15)#build), "push qword ptr [r15]";
-
-  (* (push ((qword_ptr rax)#plus_reg rcx)#build), "push qword ptr [rax + rcx]"; *)
 ]
 
+let map_all_combinations f l =
+  List.concat_map (fun outer_elem -> List.map (fun inner_elem -> (f outer_elem inner_elem)) l) l
+
+let push_r64_testcases = List.map (fun reg -> (push reg), "push " ^ (rq_to_str reg)) registers_64
+let push_r16_testcases = List.map (fun reg -> (push reg), "push " ^ (rw_to_str reg)) registers_16
+let push_indirect_r64_testcases = List.map (fun reg -> (push (qword_ptr reg)#build), "push qword ptr [" ^ (rq_to_str reg) ^ "]") registers_64
+let push_indirect_r64_plus_r64_testcases =
+  map_all_combinations (fun reg1 reg2 -> 
+      (push (qword_ptr reg1 ++ reg2)#build), 
+      "push qword ptr [" ^ (rq_to_str reg1) ^ " + " ^ (rq_to_str reg2) ^ "]") 
+    registers_64
+
+let has_failure = ref false
 let print_failure asm expected actual =
-          print_endline (Printf.sprintf "%s FAILED! Assembled to %s:" expected (bytes_to_hex_string asm));
-          print_endline (Printf.sprintf "Which disassembles to: %s" actual);
-          raise (Failure "Failed test case!")
+          print_endline (Printf.sprintf "%s FAILED! Assembled to %s - which disassembles to %s" expected (bytes_to_hex_string asm) actual);
+          has_failure := true
+
+let safe_assemble instruction =
+  try Ok(assemble instruction) with
+  | ex -> has_failure := true; Error ex
+let safe_disassemble asm = 
+  try Ok(Capstone.disassemble asm) with
+  | ex -> has_failure := true; Error ex
 
 let rec validate_testcases = function
   | [] -> ()
   | (instruction, expected_mnemonic) :: remaining ->
-    let asm = assemble instruction in
-      let disassembly = Capstone.disassemble asm in
-        if (disassembly = expected_mnemonic) then
-          print_endline (Printf.sprintf "%s OK!\t%s" expected_mnemonic (bytes_to_hex_string asm))
-        else
-          print_failure asm expected_mnemonic disassembly;
-    validate_testcases remaining
+    Printf.printf "%s " expected_mnemonic;
+    let _ = match safe_assemble instruction with
+    | Ok asm -> (
+      match safe_disassemble asm with
+      | Ok(disassembly) when (disassembly = expected_mnemonic) -> print_endline (Printf.sprintf "OK!\t%s" (bytes_to_hex_string asm))
+      | Ok(disassembly) -> print_failure asm expected_mnemonic disassembly
+      | Error ex -> Printf.printf "Failed to disassemble with exception: %s\n" (Printexc.to_string ex)
+    )
+    | Error ex -> Printf.printf "Failed to assemble with exception: %s\n" (Printexc.to_string ex)
+    in validate_testcases remaining
 
-let () = validate_testcases push_testcases
+let () = 
+validate_testcases push_imm_testcases;
+validate_testcases push_r16_testcases;
+validate_testcases push_r64_testcases;
+validate_testcases push_indirect_r64_testcases;
+validate_testcases push_indirect_r64_plus_r64_testcases;
+
+if (!has_failure) then raise (Failure "Failed one or more test cases!") else ()
