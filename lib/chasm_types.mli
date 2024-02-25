@@ -13,12 +13,15 @@ type mem_r64 = {
     offset: [`imm8 of int8 | `imm32 of int32 | `imm of int ] option;
 }
 
+type mem_size_16_64 =
+    | M16
+    | M64
+
 type mem =
     | R64Ptr of mem_r64
 
 type push_type = [ `r16 of r16   | `r64 of r64 
-                 (* | `mem16 of mem  *)
-                 | `mem64 of mem
+                 | `mem16 of mem | `mem64 of mem
                  | `imm8 of int8 | `imm16 of int16 | `imm32 of int32 | `imm of int ]
 
 type instruction =

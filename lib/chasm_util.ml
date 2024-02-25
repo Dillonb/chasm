@@ -63,6 +63,8 @@ let make_rex w r x b = let low_bits =
     (int_of_bool b) in
   if (low_bits != 0) then Some (0x40 lor low_bits) else None
 
+let prefix_op_size_override = 0x66
+
 let make_rex_bx base_num index_num =
   let rex_bit_b, rex_bit_x = (base_num >= 8), (index_num >= 8) in
     make_rex false false rex_bit_x rex_bit_b

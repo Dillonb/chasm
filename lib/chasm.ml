@@ -101,7 +101,7 @@ let imm64 x = `imm64 x
 
 let push x = Push x
 
-let assemble_push_mem mem = match validate_mem mem with 
+let assemble_push_mem size mem = match validate_mem mem with 
     | R64Ptr m ->
       let base_num, index_num = (Option.map r64_to_int m.base), (Option.map r64_to_int m.index) in
         let rex = make_rex_bx_opts base_num index_num in
@@ -109,13 +109,14 @@ let assemble_push_mem mem = match validate_mem mem with
             let sib = make_sib_opts m.scale index_num base_num in 
               let rmbits = if (Option.is_some sib) then 4 else (Option.get base_num) in (* 4 signals a present SIB byte. Otherwise, a base reg is required. *)
                 let modrm = make_modrm modbits 6 rmbits in
-                  make_bytes (rex +? ([0xFF; modrm] @? sib) @ offset)
+                  let size_prefix = if (size = M16) then (Some prefix_op_size_override) else None in
+                    make_bytes (size_prefix +? (rex +? ([0xFF; modrm] @? sib) @ offset))
 
 
 let rec assemble = function
   | Push (`r16 r)   -> let reg_num = rw_to_int(`r16 r) in
                         let rex = make_rex_b reg_num in
-                          make_bytes (0x66 :: rex +? [0x50 + (reg_num land 7)])
+                          make_bytes (prefix_op_size_override :: rex +? [0x50 + (reg_num land 7)])
 
   | Push (`r64 r)   -> let reg_num = rq_to_int(`r64 r) in
                         let rex = make_rex_b reg_num in
@@ -125,13 +126,45 @@ let rec assemble = function
   | Push (`imm16 i) -> make_bytes ([0x66; 0x68] @ (list_of_int16_le i))
   | Push (`imm32 i) -> make_bytes (0x68 :: (list_of_int32_le i))
   | Push (`imm i)   -> assemble (Push (int_to_sized_imm i))
-  | Push (`mem64 m) -> assemble_push_mem m
-  (* | Push (`mem16 m) -> assemble_push_mem m *)
+  | Push (`mem16 m) -> assemble_push_mem M16 m
+  | Push (`mem64 m) -> assemble_push_mem M64 m
 
 
 let offset_of_int = function
       | o when o == 0 -> None
       | o -> Some (`imm o)
+
+let word_ptr_of_r64_plus_offset base offset = match base, offset with
+      | `r64 base, offset ->
+        `mem16 (R64Ptr { base = Some base; index = None; scale = None; offset = offset_of_int offset})
+
+let word_ptr_of_r64_plus_r64_plus_offset base index offset = match base, index, offset with
+    (* rsp is invalid in the index field, so quietly swap it to base if possible *)
+    | `r64 base, `r64 index, offset when index = Rsp && base != Rsp -> 
+      `mem16 (R64Ptr { base = Some index; index = Some base; scale = None; offset = offset_of_int offset})
+
+    | `r64 base, `r64 index, offset -> 
+      `mem16 (R64Ptr { base = Some base; index = Some index; scale = None; offset = offset_of_int offset})
+
+let word_ptr_of_r64_plus_r64_scaled_plus_offset base index scale offset = match base, index, scale, offset with
+    | `r64 base, `r64 index, scale, offset when scale == 1 -> 
+      (* If scale is 1, call back to normal reg + reg function so that the rsp as index case can be handled there *)
+      word_ptr_of_r64_plus_r64_plus_offset (`r64 base) (`r64 index) offset
+
+    | `r64 base, `r64 index, scale, offset -> 
+      `mem16 (R64Ptr { base = Some base; index = Some index; scale = Some scale; offset = offset_of_int offset})
+
+let word_ptr_of_r64_scaled_plus_offset base scale offset = match base, scale, offset with
+    (* When the scaling factor is 1, no need to encode base in the index field *)
+    | `r64 base, scale, offset when scale == 1 -> word_ptr_of_r64_plus_offset (`r64 base) offset
+
+    | `r64 base, scale, offset -> 
+      `mem16 (R64Ptr { base = None; index = Some base; scale = Some scale; offset = offset_of_int offset})
+
+let word_ptr_of_r64 base = word_ptr_of_r64_plus_offset base 0
+let word_ptr_of_r64_plus_r64 base index = word_ptr_of_r64_plus_r64_plus_offset base index 0
+let word_ptr_of_r64_plus_r64_scaled base index scale = word_ptr_of_r64_plus_r64_scaled_plus_offset base index scale 0
+let word_ptr_of_r64_scaled base scale = word_ptr_of_r64_scaled_plus_offset base scale 0
 
 let qword_ptr_of_r64_plus_offset base offset = match base, offset with
       | `r64 base, offset ->

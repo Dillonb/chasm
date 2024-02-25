@@ -84,6 +84,30 @@ val imm32_i: int -> [> `imm32 of int32]
 val imm64: int64 -> [> `imm64 of int64]
 
 (** [reg] *)
+val word_ptr_of_r64: [`r64 of r64 ] -> [> `mem16 of mem ]
+
+(** [reg + reg] *)
+val word_ptr_of_r64_plus_r64: [ `r64 of r64 ] -> [ `r64 of r64 ] -> [> `mem16 of mem ]
+
+(** [reg + reg * scale] *)
+val word_ptr_of_r64_plus_r64_scaled: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> [> `mem16 of mem ]
+
+(** [reg * scale] *)
+val word_ptr_of_r64_scaled: [ `r64 of r64 ] -> int -> [> `mem16 of mem ]
+
+(** [reg + offset] *)
+val word_ptr_of_r64_plus_offset: [`r64 of r64 ] -> int -> [> `mem16 of mem ]
+
+(** [reg + reg + offset] *)
+val word_ptr_of_r64_plus_r64_plus_offset: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> [> `mem16 of mem ]
+
+(** [reg + reg * scale + offset] *)
+val word_ptr_of_r64_plus_r64_scaled_plus_offset: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> int -> [> `mem16 of mem ]
+
+(** [reg * scale + offset] *)
+val word_ptr_of_r64_scaled_plus_offset: [ `r64 of r64 ] -> int -> int -> [> `mem16 of mem ]
+
+(** [reg] *)
 val qword_ptr_of_r64: [`r64 of r64 ] -> [> `mem64 of mem ]
 
 (** [reg + reg] *)
