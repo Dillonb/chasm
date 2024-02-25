@@ -125,7 +125,7 @@ let indirect_r64_plus_r64_testcases instr instr_name ptr_size =
   map_all_combinations (fun reg1 reg2 -> let ins = (instr (ptr_func reg1 reg2)) in
    match reg1, reg2 with
     (* rsp is invalid in the index field, so expect the assembler to quietly swap r1 and r2*)
-    | base, index when base != rsp && index = rsp -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [rsp + " ^ (rq_to_str base) ^ "]"
+    | base, index when base <> rsp && index = rsp -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [rsp + " ^ (rq_to_str base) ^ "]"
     (* when rsp is in both fields, nothing we can do to fix it, so expect it to fail *)
     | base, index when base = rsp && index = rsp -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [rsp + rsp] *INVALID*"
     (* normal case*)
@@ -142,11 +142,11 @@ let indirect_r64_plus_r64_times_scale_testcases instr instr_name ptr_size =
           let ins = (instr (ptr_func base index scale)) in
             match base, index, scale with
               (* rsp is invalid in the index field, so expect the assembler to quietly swap r1 and r2*)
-              | base, index, scale when base != rsp && index = rsp && scale = 1 -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [rsp + " ^ (rq_to_str base) ^ "]"
+              | base, index, scale when base <> rsp && index = rsp && scale = 1 -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [rsp + " ^ (rq_to_str base) ^ "]"
               (* when rsp is in both fields, nothing we can do to fix it, so expect it to fail *)
               | base, index, scale when base = rsp && index = rsp -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [rsp + rsp*" ^ (string_of_int scale) ^"] *INVALID*"
               (* when rsp is in the index field and a scaling factor is used, nothing we can do to fix it, so expect it to fail *)
-              | base, index, scale when index = rsp && scale != 1 -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [" ^ (rq_to_str base) ^ " + rsp*" ^ (string_of_int scale) ^"] *INVALID*"
+              | base, index, scale when index = rsp && scale <> 1 -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [" ^ (rq_to_str base) ^ " + rsp*" ^ (string_of_int scale) ^"] *INVALID*"
 
               (* invalid test invalid scale values *)
               | base, index, scale when not (is_valid_scale scale) -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [" ^ (rq_to_str base) ^ " + " ^ (rq_to_str index) ^ "*" ^ (string_of_int scale) ^"] *INVALID*"
@@ -171,7 +171,7 @@ let indirect_r64_plus_r64_plus_offset_testcases instr instr_name ptr_size =
     map_all_combinations (fun reg1 reg2 -> let ins = (instr (ptr_func reg1 reg2 offset)) in
     match reg1, reg2 with
       (* rsp is invalid in the index field, so expect the assembler to quietly swap r1 and r2*)
-      | base, index when base != rsp && index = rsp -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [rsp + " ^ (rq_to_str base) ^ string_of_offset offset ^ "]"
+      | base, index when base <> rsp && index = rsp -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [rsp + " ^ (rq_to_str base) ^ string_of_offset offset ^ "]"
       (* when rsp is in both fields, nothing we can do to fix it, so expect it to fail *)
       | base, index when base = rsp && index = rsp -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [rsp + rsp" ^ string_of_offset offset ^ "] *INVALID*"
       (* normal case*)
@@ -189,11 +189,11 @@ let indirect_r64_plus_r64_times_scale_plus_offset_testcases instr instr_name ptr
         let ins = (instr (ptr_func base index scale offset)) in
           match base, index, scale with
             (* rsp is invalid in the index field, so expect the assembler to quietly swap r1 and r2*)
-            | base, index, scale when base != rsp && index = rsp && scale = 1 -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [rsp + " ^ (rq_to_str base) ^ string_of_offset offset ^ "]"
+            | base, index, scale when base <> rsp && index = rsp && scale = 1 -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [rsp + " ^ (rq_to_str base) ^ string_of_offset offset ^ "]"
             (* when rsp is in both fields, nothing we can do to fix it, so expect it to fail *)
             | base, index, scale when base = rsp && index = rsp -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [rsp + rsp*" ^ (string_of_int scale) ^ string_of_offset offset ^"] *INVALID*"
             (* when rsp is in the index field and a scaling factor is used, nothing we can do to fix it, so expect it to fail *)
-            | base, index, scale when index = rsp && scale != 1 -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [" ^ (rq_to_str base) ^ " + rsp*" ^ (string_of_int scale) ^ string_of_offset offset ^"] *INVALID*"
+            | base, index, scale when index = rsp && scale <> 1 -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [" ^ (rq_to_str base) ^ " + rsp*" ^ (string_of_int scale) ^ string_of_offset offset ^"] *INVALID*"
 
             (* invalid test invalid scale values *)
             | base, index, scale when not (is_valid_scale scale) -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [" ^ (rq_to_str base) ^ " + " ^ (rq_to_str index) ^ "*" ^ (string_of_int scale) ^ string_of_offset offset ^"] *INVALID*"

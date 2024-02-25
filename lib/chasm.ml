@@ -140,7 +140,7 @@ let word_ptr_of_r64_plus_offset base offset = match base, offset with
 
 let word_ptr_of_r64_plus_r64_plus_offset base index offset = match base, index, offset with
     (* rsp is invalid in the index field, so quietly swap it to base if possible *)
-    | `r64 base, `r64 index, offset when index = Rsp && base != Rsp -> 
+    | `r64 base, `r64 index, offset when index = Rsp && base <> Rsp -> 
       `mem16 (R64Ptr { base = Some index; index = Some base; scale = None; offset = offset_of_int offset})
 
     | `r64 base, `r64 index, offset -> 
@@ -172,7 +172,7 @@ let qword_ptr_of_r64_plus_offset base offset = match base, offset with
 
 let qword_ptr_of_r64_plus_r64_plus_offset base index offset = match base, index, offset with
     (* rsp is invalid in the index field, so quietly swap it to base if possible *)
-    | `r64 base, `r64 index, offset when index = Rsp && base != Rsp -> 
+    | `r64 base, `r64 index, offset when index = Rsp && base <> Rsp -> 
       `mem64 (R64Ptr { base = Some index; index = Some base; scale = None; offset = offset_of_int offset})
 
     | `r64 base, `r64 index, offset -> 

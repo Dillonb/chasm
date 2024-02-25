@@ -61,7 +61,7 @@ let make_rex w r x b = let low_bits =
     ((int_of_bool r) lsl 2) lor
     (int_of_bool x lsl 1) lor
     (int_of_bool b) in
-  if (low_bits != 0) then Some (0x40 lor low_bits) else None
+  if (low_bits <> 0) then Some (0x40 lor low_bits) else None
 
 let prefix_op_size_override = 0x66
 
@@ -128,7 +128,7 @@ let validate_mem = function
   | R64Ptr { base=Some Rsp; index=Some Rsp; scale=_; offset=_} ->
       raise (Invalid_encoding "RSP is not valid in the index field (the base field is also RSP so they cannot be swapped)")
 
-  | R64Ptr { base=Some _; index = Some Rsp; scale=Some scale; offset=_} when scale != 1 ->
+  | R64Ptr { base=Some _; index = Some Rsp; scale=Some scale; offset=_} when scale <> 1 ->
       raise (Invalid_encoding "Cannot scale the RSP register")
 
   | m -> m
