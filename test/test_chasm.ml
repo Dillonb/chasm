@@ -211,6 +211,3 @@ validate_testcases push_indirect_r64_plus_r64_times_scale_plus_offset_testcases;
 
 Printf.printf "Passed %d testcases!\n" !num_success;
 if (!num_failures > 0) then raise (Failure (Printf.sprintf "Failed %d test case%s!" !num_failures (if !num_failures == 1 then "" else "s"))) else ()
-
-let () = let _ = push_indirect_r64_plus_r64_plus_offset_testcases in ()
-let () = let _ = push_indirect_r64_plus_r64_times_scale_plus_offset_testcases in ()
