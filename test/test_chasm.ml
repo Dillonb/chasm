@@ -138,8 +138,8 @@ let push_indirect_r64_plus_r64_times_scale_testcases = List.concat_map (
           | base, index, scale -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + " ^ (rq_to_str index) ^ "*" ^ (string_of_int scale) ^"]"
     ) registers_64) scale_values
 
-let push_indirect_r64_plus_offset_testcases = List.concat_map (fun offset -> 
-  List.map (fun reg -> (push (qword_ptr_of_r64_plus_offset reg offset)), "push qword ptr [" ^ (rq_to_str reg) ^ string_of_offset offset ^ "]") registers_64
+let indirect_r64_plus_offset_testcases instr instr_name = List.concat_map (fun offset -> 
+  List.map (fun reg -> (instr (qword_ptr_of_r64_plus_offset reg offset)), instr_name ^ " qword ptr [" ^ (rq_to_str reg) ^ string_of_offset offset ^ "]") registers_64
 ) offset_values
 
 let push_indirect_r64_plus_r64_plus_offset_testcases = List.concat_map (fun offset ->
@@ -205,7 +205,7 @@ validate_testcases push_r64_testcases;
 validate_testcases push_indirect_r64_testcases;
 validate_testcases push_indirect_r64_plus_r64_testcases;
 validate_testcases push_indirect_r64_plus_r64_times_scale_testcases;
-validate_testcases push_indirect_r64_plus_offset_testcases;
+validate_testcases (indirect_r64_plus_offset_testcases push "push");
 validate_testcases push_indirect_r64_plus_r64_plus_offset_testcases;
 validate_testcases push_indirect_r64_plus_r64_times_scale_plus_offset_testcases;
 
