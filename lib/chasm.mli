@@ -83,37 +83,32 @@ val imm32: int32 -> [> `imm32 of int32]
 val imm32_i: int -> [> `imm32 of int32]
 val imm64: int64 -> [> `imm64 of int64]
 
-class mem_op_base_plus_ofs_times_scale :
-  r64 * r64 * int ->
-object
-  method build : [> `mem of mem ]
-end
+(** [reg] *)
+val qword_ptr_of_r64: [`r64 of r64 ] -> [> `mem64 of mem ]
 
-class mem_op_base_plus_ofs :
-  r64 * r64 ->
-object
-  method times_scale : int -> mem_op_base_plus_ofs_times_scale
-  method build : [> `mem of mem ]
-end
+(** [reg + reg] *)
+val qword_ptr_of_r64_plus_r64: [ `r64 of r64 ] -> [ `r64 of r64 ] -> [> `mem64 of mem ]
 
-class mem_op_base : r64 -> object
-  method build : [> `mem of mem ]
+(** [reg + reg * scale] *)
+val qword_ptr_of_r64_plus_r64_scaled: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> [> `mem64 of mem ]
 
-  method plus_reg : [ `r64 of r64 ] -> mem_op_base_plus_ofs
-end
+(** [reg * scale] *)
+val qword_ptr_of_r64_scaled: [ `r64 of r64 ] -> int -> [> `mem64 of mem ]
 
-val (|+) : mem_op_base -> [ `r64 of r64] -> mem_op_base_plus_ofs
-val (|*) : mem_op_base_plus_ofs -> int -> mem_op_base_plus_ofs_times_scale
+(** [reg + offset] *)
+val qword_ptr_of_r64_plus_offset: [`r64 of r64 ] -> int -> [> `mem64 of mem ]
 
-class mem_op : object
-    method base : r64 -> mem_op_base
-end
+(** [reg + reg + offset] *)
+val qword_ptr_of_r64_plus_r64_plus_offset: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> [> `mem64 of mem ]
 
-val qword_ptr: [< `r64 of r64 ] -> mem_op_base
+(** [reg + reg * scale + offset] *)
+val qword_ptr_of_r64_plus_r64_scaled_plus_offset: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> int -> [> `mem64 of mem ]
+
+(** [reg * scale + offset] *)
+val qword_ptr_of_r64_scaled_plus_offset: [ `r64 of r64 ] -> int -> int -> [> `mem64 of mem ]
+
 
 val push: push_type -> instruction
-
-exception Invalid_encoding of string
 
 val assemble: instruction -> bytes
 val assemble_list: instruction list -> bytes

@@ -1,0 +1,1 @@
+exception Invalid_encoding of string

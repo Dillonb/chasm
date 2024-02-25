@@ -1,3 +1,4 @@
+open Chasm_exceptions
 open Chasm_types
 open Stdint
 
@@ -21,6 +22,10 @@ let rq_to_int = function
   | `r64 Rax ->  0 | `r64 Rcx ->  1 | `r64 Rdx ->  2 | `r64 Rbx ->  3 | `r64 Rsp ->  4 | `r64 Rbp ->  5 | `r64 Rsi ->  6 | `r64 Rdi ->  7
   | `r64 R8  ->  8 | `r64 R9  ->  9 | `r64 R10 -> 10 | `r64 R11 -> 11 | `r64 R12 -> 12 | `r64 R13 -> 13 | `r64 R14 -> 14 | `r64 R15 -> 15
 
+let r64_to_int = function
+  | Rax ->  0 | Rcx ->  1 | Rdx ->  2 | Rbx ->  3 | Rsp ->  4 | Rbp ->  5 | Rsi ->  6 | Rdi ->  7
+  | R8  ->  8 | R9  ->  9 | R10 -> 10 | R11 -> 11 | R12 -> 12 | R13 -> 13 | R14 -> 14 | R15 -> 15
+
 let is_int8 x =
   let min = Int8.to_int Int8.min_int in
   let max = Int8.to_int Int8.max_int in
@@ -41,6 +46,11 @@ let int_to_sized_imm = function
   | x when is_int32 x -> `imm32 (Int32.of_int x)
   | _ -> raise (Invalid_argument "Int either too large or too small to represent in an immediate!")
 
+let int_to_sized_imm8_or_imm32 = function
+  | x when is_int8 x  -> `imm8 (Int8.of_int x)
+  | x when is_int32 x -> `imm32 (Int32.of_int x)
+  | _ -> raise (Invalid_argument "Int either too large or too small to represent in an immediate!")
+
 
 let list_of_int16_le x = let x = Int16.to_int x in [ x land 0xFF; (x lsr 8) land 0xFF; ]
 let list_of_int32_le x = let x = Int32.to_int x in [ x land 0xFF; (x lsr 8) land 0xFF; (x lsr 16) land 0xFF; (x lsr 24) land 0xFF ]
@@ -58,6 +68,7 @@ let make_rex_bx base_num index_num =
     make_rex false false rex_bit_x rex_bit_b
 
 let make_rex_b reg_num = make_rex false false false (reg_num >= 8)
+let make_rex_x reg_num = make_rex false false (reg_num >= 8) false
 
 let make_modrm modbits reg rm =
   ((modbits land 0b11) lsl 6) lor
@@ -84,3 +95,62 @@ let (+?) o l = match o with
 let (@?) l o = match o with
   | Some i -> l @ [i]
   | None -> l
+
+let get_scale_bits = function
+  | 1 -> 0
+  | 2 -> 1
+  | 4 -> 2
+  | 8 -> 3
+  | _ -> raise (Invalid_encoding "The only valid values for scale are: 1, 2, 4, 8")
+
+let make_rex_bx_opts b x = match b, x with
+  | None,   None -> None
+  | Some b, None   -> make_rex_b b
+  | None,   Some x -> make_rex_x x
+  | Some b, Some x -> make_rex_bx b x
+
+
+let make_sib_opts scale index base = match scale, index, base with
+    (* Special case: need a sib byte even without a scale and an index if base is RSP or R12 *)
+    | None, None, Some base when (base land 7) == 4 -> Some (make_sib 0 4 4)
+
+    (* Don't need a sib byte when we only have a base. *)
+    | None, None, Some _ -> None
+
+    | scale, index, base -> Some (make_sib 
+      (get_scale_bits (Option.value scale ~default:1)) 
+      (Option.value index ~default:4) 
+      (Option.value base  ~default:4)) (* TODO: is this default base value correct? *)
+
+let validate_mem = function
+  | R64Ptr { base=Some Rsp; index=Some Rsp; scale=_; offset=_} ->
+      raise (Invalid_encoding "RSP is not valid in the index field (the base field is also RSP so they cannot be swapped)")
+
+  | R64Ptr { base=Some _; index = Some Rsp; scale=Some scale; offset=_} when scale != 1 ->
+      raise (Invalid_encoding "Cannot scale the RSP register")
+
+  | m -> m
+
+let get_modbits_and_offset base offset = 
+  let resolve_ofs = (function
+    | Some(`imm8 i)  -> Some(`imm8 i)
+    | Some(`imm32 i) -> Some(`imm32 i)
+    | Some(`imm i)   -> Some(int_to_sized_imm8_or_imm32 i)
+    | None           -> None ) in
+      match base, (resolve_ofs offset) with
+        (* rbp or r13 in base with mod = 0 signals no base - so we need to set mod = 1 and include an offset *)
+        | Some Rbp, None | Some R13, None -> 1, [0]
+
+        (* any other reg with no offset - set mod = 0 and don't include an offset *)
+        | Some _, None -> 0, []
+
+        (* any other base with an offset - mod = 0, include an offset *)
+        | Some _, Some (`imm8 offset)  -> 1, [Int8.to_int offset]
+        | Some _, Some (`imm32 offset) -> 2, list_of_int32_le offset
+
+        (* no base with an offset - include an offset *)
+        | None, Some (`imm8 offset)  -> 1, [Int8.to_int offset]
+        | None, Some (`imm32 offset) -> 2, list_of_int32_le offset
+
+        (* no base and no offset - mod = 0, no offset*)
+        | None, None -> 0, []

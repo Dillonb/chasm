@@ -1,5 +1,6 @@
 open Chasm
 open Chasm__Chasm_types
+open Chasm__Chasm_exceptions
 open Stdint
 
 let print_success = false
@@ -92,11 +93,23 @@ let push_imm_testcases = [
 let map_all_combinations f l =
   List.concat_map (fun outer_elem -> List.map (fun inner_elem -> (f outer_elem inner_elem)) l) l
 
+let scale_values = [-1; 0; 1; 2; 3; 4; 5; 6; 7; 8; 9; ]
+let offset_values = [-1; -5; -9; -10; 0; 1; 5; 9; 10; -127; -128; -65536; 65536; -2147483648; 2147483647 ]
+
+let string_of_offset = function
+  | ofs when ofs = 0 -> ""
+  | ofs when ofs < 10 && ofs > 0 -> Printf.sprintf " + %d" ofs
+  | ofs when ofs > -10 && ofs < 0 -> Printf.sprintf " - %d" (abs ofs)
+  | ofs when ofs < 0 -> Printf.sprintf " - 0x%x" (abs ofs)
+  | ofs -> Printf.sprintf " + 0x%x" ofs
+
+let is_valid_scale scale = scale == 1 || scale == 2 || scale == 4 || scale == 8
+
 let push_r64_testcases = List.map (fun reg -> (push reg), "push " ^ (rq_to_str reg)) registers_64
 let push_r16_testcases = List.map (fun reg -> (push reg), "push " ^ (rw_to_str reg)) registers_16
-let push_indirect_r64_testcases = List.map (fun reg -> (push (qword_ptr reg)#build), "push qword ptr [" ^ (rq_to_str reg) ^ "]") registers_64
+let push_indirect_r64_testcases = List.map (fun reg -> (push (qword_ptr_of_r64 reg)), "push qword ptr [" ^ (rq_to_str reg) ^ "]") registers_64
 let push_indirect_r64_plus_r64_testcases =
-  map_all_combinations (fun reg1 reg2 -> let ins = (push (qword_ptr reg1 |+ reg2)#build) in
+  map_all_combinations (fun reg1 reg2 -> let ins = (push (qword_ptr_of_r64_plus_r64 reg1 reg2)) in
    match reg1, reg2 with
     (* rsp is invalid in the index field, so expect the assembler to quietly swap r1 and r2*)
     | base, index when base != rsp && index = rsp -> ins, "push qword ptr [rsp + " ^ (rq_to_str base) ^ "]"
@@ -106,26 +119,59 @@ let push_indirect_r64_plus_r64_testcases =
     | reg1, reg2 -> ins, "push qword ptr [" ^ (rq_to_str reg1) ^ " + " ^ (rq_to_str reg2) ^ "]") 
     registers_64
 
-let is_valid_scale scale = scale == 1 || scale == 2 || scale == 4 || scale == 8
-
 let push_indirect_r64_plus_r64_times_scale_testcases = List.concat_map (
   fun scale -> map_all_combinations (
     fun base index ->
-      let ins = (push (qword_ptr base |+ index |* scale)#build) in
-      match base, index, scale with
-      (* rsp is invalid in the index field, so expect the assembler to quietly swap r1 and r2*)
-      | base, index, scale when base != rsp && index = rsp && scale = 1 -> ins, "push qword ptr [rsp + " ^ (rq_to_str base) ^ "]"
-      (* when rsp is in both fields, nothing we can do to fix it, so expect it to fail *)
-      | base, index, scale when base = rsp && index = rsp -> ins, "push qword ptr [rsp + rsp*" ^ (string_of_int scale) ^"] *INVALID*"
-      (* when rsp is in the index field and a scaling factor is used, nothing we can do to fix it, so expect it to fail *)
-      | base, index, scale when index = rsp && scale != 1 -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + rsp*" ^ (string_of_int scale) ^"] *INVALID*"
+      let ins = (push (qword_ptr_of_r64_plus_r64_scaled base index scale)) in
+        match base, index, scale with
+          (* rsp is invalid in the index field, so expect the assembler to quietly swap r1 and r2*)
+          | base, index, scale when base != rsp && index = rsp && scale = 1 -> ins, "push qword ptr [rsp + " ^ (rq_to_str base) ^ "]"
+          (* when rsp is in both fields, nothing we can do to fix it, so expect it to fail *)
+          | base, index, scale when base = rsp && index = rsp -> ins, "push qword ptr [rsp + rsp*" ^ (string_of_int scale) ^"] *INVALID*"
+          (* when rsp is in the index field and a scaling factor is used, nothing we can do to fix it, so expect it to fail *)
+          | base, index, scale when index = rsp && scale != 1 -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + rsp*" ^ (string_of_int scale) ^"] *INVALID*"
 
-      (* invalid test invalid scale values *)
-      | base, index, scale when not (is_valid_scale scale) -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + " ^ (rq_to_str index) ^ "*" ^ (string_of_int scale) ^"] *INVALID*"
+          (* invalid test invalid scale values *)
+          | base, index, scale when not (is_valid_scale scale) -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + " ^ (rq_to_str index) ^ "*" ^ (string_of_int scale) ^"] *INVALID*"
 
-      | base, index, scale when scale = 1 -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + " ^ (rq_to_str index) ^ "]"
-      | base, index, scale -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + " ^ (rq_to_str index) ^ "*" ^ (string_of_int scale) ^"]"
-    ) registers_64) [-1; 0; 1; 2; 3; 4; 5; 6; 7; 8; 9; ]
+          | base, index, scale when scale = 1 -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + " ^ (rq_to_str index) ^ "]"
+          | base, index, scale -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + " ^ (rq_to_str index) ^ "*" ^ (string_of_int scale) ^"]"
+    ) registers_64) scale_values
+
+let push_indirect_r64_plus_offset_testcases = List.concat_map (fun offset -> 
+  List.map (fun reg -> (push (qword_ptr_of_r64_plus_offset reg offset)), "push qword ptr [" ^ (rq_to_str reg) ^ string_of_offset offset ^ "]") registers_64
+) offset_values
+
+let push_indirect_r64_plus_r64_plus_offset_testcases = List.concat_map (fun offset ->
+  map_all_combinations (fun reg1 reg2 -> let ins = (push (qword_ptr_of_r64_plus_r64_plus_offset reg1 reg2 offset)) in
+   match reg1, reg2 with
+    (* rsp is invalid in the index field, so expect the assembler to quietly swap r1 and r2*)
+    | base, index when base != rsp && index = rsp -> ins, "push qword ptr [rsp + " ^ (rq_to_str base) ^ string_of_offset offset ^ "]"
+    (* when rsp is in both fields, nothing we can do to fix it, so expect it to fail *)
+    | base, index when base = rsp && index = rsp -> ins, "push qword ptr [rsp + rsp" ^ string_of_offset offset ^ "] *INVALID*"
+    (* normal case*)
+    | reg1, reg2 -> ins, "push qword ptr [" ^ (rq_to_str reg1) ^ " + " ^ (rq_to_str reg2) ^ string_of_offset offset ^ "]") 
+    registers_64
+) offset_values
+
+let push_indirect_r64_plus_r64_times_scale_plus_offset_testcases = List.concat_map (fun offset -> List.concat_map (
+  fun scale -> map_all_combinations (
+    fun base index ->
+      let ins = (push (qword_ptr_of_r64_plus_r64_scaled_plus_offset base index scale offset)) in
+        match base, index, scale with
+          (* rsp is invalid in the index field, so expect the assembler to quietly swap r1 and r2*)
+          | base, index, scale when base != rsp && index = rsp && scale = 1 -> ins, "push qword ptr [rsp + " ^ (rq_to_str base) ^ string_of_offset offset ^ "]"
+          (* when rsp is in both fields, nothing we can do to fix it, so expect it to fail *)
+          | base, index, scale when base = rsp && index = rsp -> ins, "push qword ptr [rsp + rsp*" ^ (string_of_int scale) ^ string_of_offset offset ^"] *INVALID*"
+          (* when rsp is in the index field and a scaling factor is used, nothing we can do to fix it, so expect it to fail *)
+          | base, index, scale when index = rsp && scale != 1 -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + rsp*" ^ (string_of_int scale) ^ string_of_offset offset ^"] *INVALID*"
+
+          (* invalid test invalid scale values *)
+          | base, index, scale when not (is_valid_scale scale) -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + " ^ (rq_to_str index) ^ "*" ^ (string_of_int scale) ^ string_of_offset offset ^"] *INVALID*"
+
+          | base, index, scale when scale = 1 -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + " ^ (rq_to_str index) ^ string_of_offset offset ^ "]"
+          | base, index, scale -> ins, "push qword ptr [" ^ (rq_to_str base) ^ " + " ^ (rq_to_str index) ^ "*" ^ (string_of_int scale) ^ string_of_offset offset ^"]"
+    ) registers_64) scale_values) offset_values
 
 let num_failures = ref 0
 let num_success = ref 0
@@ -159,5 +205,12 @@ validate_testcases push_r64_testcases;
 validate_testcases push_indirect_r64_testcases;
 validate_testcases push_indirect_r64_plus_r64_testcases;
 validate_testcases push_indirect_r64_plus_r64_times_scale_testcases;
+validate_testcases push_indirect_r64_plus_offset_testcases;
+validate_testcases push_indirect_r64_plus_r64_plus_offset_testcases;
+validate_testcases push_indirect_r64_plus_r64_times_scale_plus_offset_testcases;
+
 Printf.printf "Passed %d testcases!\n" !num_success;
 if (!num_failures > 0) then raise (Failure (Printf.sprintf "Failed %d test case%s!" !num_failures (if !num_failures == 1 then "" else "s"))) else ()
+
+let () = let _ = push_indirect_r64_plus_r64_plus_offset_testcases in ()
+let () = let _ = push_indirect_r64_plus_r64_times_scale_plus_offset_testcases in ()

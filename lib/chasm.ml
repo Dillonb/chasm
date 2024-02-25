@@ -101,38 +101,16 @@ let imm64 x = `imm64 x
 
 let push x = Push x
 
-exception Invalid_encoding of string
+let assemble_push_mem mem = match validate_mem mem with 
+    | R64Ptr m ->
+      let base_num, index_num = (Option.map r64_to_int m.base), (Option.map r64_to_int m.index) in
+        let rex = make_rex_bx_opts base_num index_num in
+          let modbits, offset = get_modbits_and_offset m.base m.offset in
+            let sib = make_sib_opts m.scale index_num base_num in 
+              let rmbits = if (Option.is_some sib) then 4 else (Option.get base_num) in (* 4 signals a present SIB byte. Otherwise, a base reg is required. *)
+                let modrm = make_modrm modbits 6 rmbits in
+                  make_bytes (rex +? ([0xFF; modrm] @? sib) @ offset)
 
-let get_scale_bits = function
-  | 1 -> 0
-  | 2 -> 1
-  | 4 -> 2
-  | 8 -> 3
-  | _ -> raise (Invalid_encoding "The only valid values for scale are: 1, 2, 4, 8")
-
-let rec assemble_push_mem = function
-  | R64Base r ->
-    let reg_num = rq_to_int (`r64 r) in
-      let rex = make_rex_b reg_num in
-        let sib = if (((reg_num land 7) == 4)) then Some 0x24 else None in (* rsp/r12 need SIB byte *)
-          let modbits, offset = if ((reg_num land 7) == 5) then (1, Some 0) else (0, None) in (* using the base pointer (or r13) requires an offset *)
-            make_bytes (rex +? ([0xFF; make_modrm modbits 6 reg_num] @? sib) @? offset)
-
-  (* this form is just the base index scale form with a scale of 1 *)
-  | R64BasePlusIndex (base, index) -> assemble_push_mem (R64BasePlusIndexTimesScale(base, index, 1))
-
-  (* rsp is invalid in the index field, so quietly swap it to base if possible *)
-  | R64BasePlusIndexTimesScale (base, index, scale) when base != Rsp && index = Rsp && scale = 1 -> assemble_push_mem(R64BasePlusIndex(index, base))
-  (* can't swap if there's a scale value *)
-  | R64BasePlusIndexTimesScale (_, index, scale) when index = Rsp && scale != 1 -> raise (Invalid_encoding "RSP is not valid in the index field (a scaling factor was used, so it cannot be swapped with the base field)")
-  (* can't swap if base is also rsp *)
-  | R64BasePlusIndexTimesScale (base, index, _) when base = Rsp && index = Rsp -> raise (Invalid_encoding "RSP is not valid in the index field (the base field is also RSP so they cannot be swapped)")
-
-  | R64BasePlusIndexTimesScale (base, index, scale) ->
-    let base_num, index_num = rq_to_int (`r64 base), rq_to_int(`r64 index) in
-      let rex = make_rex_bx base_num index_num in
-          let modbits, offset = if ((base_num land 7) == 5) then (1, Some 0) else (0, None) in (* using the base pointer (or r13) requires an offset *)
-            make_bytes (rex +? [0xFF; make_modrm modbits 6 4; make_sib (get_scale_bits scale) index_num base_num] @? offset)
 
 let rec assemble = function
   | Push (`r16 r)   -> let reg_num = rw_to_int(`r16 r) in
@@ -147,34 +125,45 @@ let rec assemble = function
   | Push (`imm16 i) -> make_bytes ([0x66; 0x68] @ (list_of_int16_le i))
   | Push (`imm32 i) -> make_bytes (0x68 :: (list_of_int32_le i))
   | Push (`imm i)   -> assemble (Push (int_to_sized_imm i))
-  | Push (`mem m) -> assemble_push_mem m
+  | Push (`mem64 m) -> assemble_push_mem m
+  (* | Push (`mem16 m) -> assemble_push_mem m *)
+
+
+let offset_of_int = function
+      | o when o == 0 -> None
+      | o -> Some (`imm o)
+
+let qword_ptr_of_r64_plus_offset base offset = match base, offset with
+      | `r64 base, offset ->
+        `mem64 (R64Ptr { base = Some base; index = None; scale = None; offset = offset_of_int offset})
+
+let qword_ptr_of_r64_plus_r64_plus_offset base index offset = match base, index, offset with
+    (* rsp is invalid in the index field, so quietly swap it to base if possible *)
+    | `r64 base, `r64 index, offset when index = Rsp && base != Rsp -> 
+      `mem64 (R64Ptr { base = Some index; index = Some base; scale = None; offset = offset_of_int offset})
+
+    | `r64 base, `r64 index, offset -> 
+      `mem64 (R64Ptr { base = Some base; index = Some index; scale = None; offset = offset_of_int offset})
+
+let qword_ptr_of_r64_plus_r64_scaled_plus_offset base index scale offset = match base, index, scale, offset with
+    | `r64 base, `r64 index, scale, offset when scale == 1 -> 
+      (* If scale is 1, call back to normal reg + reg function so that the rsp as index case can be handled there *)
+      qword_ptr_of_r64_plus_r64_plus_offset (`r64 base) (`r64 index) offset
+
+    | `r64 base, `r64 index, scale, offset -> 
+      `mem64 (R64Ptr { base = Some base; index = Some index; scale = Some scale; offset = offset_of_int offset})
+
+let qword_ptr_of_r64_scaled_plus_offset base scale offset = match base, scale, offset with
+    (* When the scaling factor is 1, no need to encode base in the index field *)
+    | `r64 base, scale, offset when scale == 1 -> qword_ptr_of_r64_plus_offset (`r64 base) offset
+
+    | `r64 base, scale, offset -> 
+      `mem64 (R64Ptr { base = None; index = Some base; scale = Some scale; offset = offset_of_int offset})
+
+let qword_ptr_of_r64 base = qword_ptr_of_r64_plus_offset base 0
+let qword_ptr_of_r64_plus_r64 base index = qword_ptr_of_r64_plus_r64_plus_offset base index 0
+let qword_ptr_of_r64_plus_r64_scaled base index scale = qword_ptr_of_r64_plus_r64_scaled_plus_offset base index scale 0
+let qword_ptr_of_r64_scaled base scale = qword_ptr_of_r64_scaled_plus_offset base scale 0
 
 let assemble_list instrs = let asm = List.map assemble instrs in
   Bytes.concat Bytes.empty asm
-
-class mem_op_base_plus_ofs_times_scale (base, ofs, scale) = object
-  method build : 'a. [> `mem of mem ] as 'a = `mem (R64BasePlusIndexTimesScale (base, ofs, scale))
-end
-
-class mem_op_base_plus_ofs (base_reg, ofs_reg) = object
-  val base = base_reg
-  val ofs = ofs_reg
-  method times_scale (scale : int) = (new mem_op_base_plus_ofs_times_scale (base, ofs, scale))
-  method build : 'a. [> `mem of mem ] as 'a = `mem (R64BasePlusIndex (base, ofs))
-end
-
-class mem_op_base base_reg = object
-  method build : 'a. [> `mem of mem ] as 'a = `mem (R64Base base_reg)
-  method plus_reg (r: [> `r64 of r64 ]) = match r with
-    | `r64 r -> new mem_op_base_plus_ofs (base_reg, r)
-end
-
-let (|+) (op : mem_op_base) (r: [> `r64 of r64 ]) = op#plus_reg(r)
-let (|*) (op : mem_op_base_plus_ofs) scale = op#times_scale(scale)
-
-class mem_op = object
-  method base reg = new mem_op_base reg
-end
-
-let qword_ptr = function
-  | `r64 r -> ((new mem_op)#base(r))
