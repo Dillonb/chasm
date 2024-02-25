@@ -101,17 +101,22 @@ let imm64 x = `imm64 x
 
 let push x = Push x
 
-let assemble_push_mem size mem = match validate_mem mem with 
+let assemble_push_mem size mem = 
+  let do_assemble m base_num index_num prefix = 
+    let rex = make_rex_bx_opts base_num index_num in
+      let modbits, offset = get_modbits_and_offset base_num m.offset in
+        let sib = make_sib_opts m.scale index_num base_num in 
+          let rmbits = if (Option.is_some sib) then 4 else (Option.get base_num) in (* 4 signals a present SIB byte. Otherwise, a base reg is required. *)
+            let modrm = make_modrm modbits 6 rmbits in
+              let size_prefix = if (size = M16) then (Some prefix_op_size_override) else None in
+                make_bytes (prefix +? (size_prefix +? (rex +? ([0xFF; modrm] @? sib) @ offset))) in
+  match validate_mem mem with 
     | R64Ptr m ->
       let base_num, index_num = (Option.map r64_to_int m.base), (Option.map r64_to_int m.index) in
-        let rex = make_rex_bx_opts base_num index_num in
-          let modbits, offset = get_modbits_and_offset m.base m.offset in
-            let sib = make_sib_opts m.scale index_num base_num in 
-              let rmbits = if (Option.is_some sib) then 4 else (Option.get base_num) in (* 4 signals a present SIB byte. Otherwise, a base reg is required. *)
-                let modrm = make_modrm modbits 6 rmbits in
-                  let size_prefix = if (size = M16) then (Some prefix_op_size_override) else None in
-                    make_bytes (size_prefix +? (rex +? ([0xFF; modrm] @? sib) @ offset))
-
+        do_assemble m base_num index_num None
+    | R32Ptr m ->
+      let base_num, index_num = (Option.map r32_to_int m.base), (Option.map r32_to_int m.index) in
+        do_assemble m base_num index_num (Some prefix_addr_size_override)
 
 let rec assemble = function
   | Push (`r16 r)   -> let reg_num = rw_to_int(`r16 r) in
@@ -197,6 +202,70 @@ let qword_ptr_of_r64 base = qword_ptr_of_r64_plus_offset base 0
 let qword_ptr_of_r64_plus_r64 base index = qword_ptr_of_r64_plus_r64_plus_offset base index 0
 let qword_ptr_of_r64_plus_r64_scaled base index scale = qword_ptr_of_r64_plus_r64_scaled_plus_offset base index scale 0
 let qword_ptr_of_r64_scaled base scale = qword_ptr_of_r64_scaled_plus_offset base scale 0
+
+let word_ptr_of_r32_plus_offset base offset = match base, offset with
+      | `r32 base, offset ->
+        `mem16 (R32Ptr { base = Some base; index = None; scale = None; offset = offset_of_int offset})
+
+let word_ptr_of_r32_plus_r32_plus_offset base index offset = match base, index, offset with
+    (* rsp is invalid in the index field, so quietly swap it to base if possible *)
+    | `r32 base, `r32 index, offset when index = Esp && base <> Esp -> 
+      `mem16 (R32Ptr { base = Some index; index = Some base; scale = None; offset = offset_of_int offset})
+
+    | `r32 base, `r32 index, offset -> 
+      `mem16 (R32Ptr { base = Some base; index = Some index; scale = None; offset = offset_of_int offset})
+
+let word_ptr_of_r32_plus_r32_scaled_plus_offset base index scale offset = match base, index, scale, offset with
+    | `r32 base, `r32 index, scale, offset when scale == 1 -> 
+      (* If scale is 1, call back to normal reg + reg function so that the rsp as index case can be handled there *)
+      word_ptr_of_r32_plus_r32_plus_offset (`r32 base) (`r32 index) offset
+
+    | `r32 base, `r32 index, scale, offset -> 
+      `mem16 (R32Ptr { base = Some base; index = Some index; scale = Some scale; offset = offset_of_int offset})
+
+let word_ptr_of_r32_scaled_plus_offset base scale offset = match base, scale, offset with
+    (* When the scaling factor is 1, no need to encode base in the index field *)
+    | `r32 base, scale, offset when scale == 1 -> word_ptr_of_r32_plus_offset (`r32 base) offset
+
+    | `r32 base, scale, offset -> 
+      `mem16 (R32Ptr { base = None; index = Some base; scale = Some scale; offset = offset_of_int offset})
+
+let word_ptr_of_r32 base = word_ptr_of_r32_plus_offset base 0
+let word_ptr_of_r32_plus_r32 base index = word_ptr_of_r32_plus_r32_plus_offset base index 0
+let word_ptr_of_r32_plus_r32_scaled base index scale = word_ptr_of_r32_plus_r32_scaled_plus_offset base index scale 0
+let word_ptr_of_r32_scaled base scale = word_ptr_of_r32_scaled_plus_offset base scale 0
+
+let qword_ptr_of_r32_plus_offset base offset = match base, offset with
+      | `r32 base, offset ->
+        `mem64 (R32Ptr { base = Some base; index = None; scale = None; offset = offset_of_int offset})
+
+let qword_ptr_of_r32_plus_r32_plus_offset base index offset = match base, index, offset with
+    (* rsp is invalid in the index field, so quietly swap it to base if possible *)
+    | `r32 base, `r32 index, offset when index = Esp && base <> Esp -> 
+      `mem64 (R32Ptr { base = Some index; index = Some base; scale = None; offset = offset_of_int offset})
+
+    | `r32 base, `r32 index, offset -> 
+      `mem64 (R32Ptr { base = Some base; index = Some index; scale = None; offset = offset_of_int offset})
+
+let qword_ptr_of_r32_plus_r32_scaled_plus_offset base index scale offset = match base, index, scale, offset with
+    | `r32 base, `r32 index, scale, offset when scale == 1 -> 
+      (* If scale is 1, call back to normal reg + reg function so that the rsp as index case can be handled there *)
+      qword_ptr_of_r32_plus_r32_plus_offset (`r32 base) (`r32 index) offset
+
+    | `r32 base, `r32 index, scale, offset -> 
+      `mem64 (R32Ptr { base = Some base; index = Some index; scale = Some scale; offset = offset_of_int offset})
+
+let qword_ptr_of_r32_scaled_plus_offset base scale offset = match base, scale, offset with
+    (* When the scaling factor is 1, no need to encode base in the index field *)
+    | `r32 base, scale, offset when scale == 1 -> qword_ptr_of_r32_plus_offset (`r32 base) offset
+
+    | `r32 base, scale, offset -> 
+      `mem64 (R32Ptr { base = None; index = Some base; scale = Some scale; offset = offset_of_int offset})
+
+let qword_ptr_of_r32 base = qword_ptr_of_r32_plus_offset base 0
+let qword_ptr_of_r32_plus_r32 base index = qword_ptr_of_r32_plus_r32_plus_offset base index 0
+let qword_ptr_of_r32_plus_r32_scaled base index scale = qword_ptr_of_r32_plus_r32_scaled_plus_offset base index scale 0
+let qword_ptr_of_r32_scaled base scale = qword_ptr_of_r32_scaled_plus_offset base scale 0
 
 let assemble_list instrs = let asm = List.map assemble instrs in
   Bytes.concat Bytes.empty asm

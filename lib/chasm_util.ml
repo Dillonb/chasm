@@ -22,6 +22,10 @@ let rq_to_int = function
   | `r64 Rax ->  0 | `r64 Rcx ->  1 | `r64 Rdx ->  2 | `r64 Rbx ->  3 | `r64 Rsp ->  4 | `r64 Rbp ->  5 | `r64 Rsi ->  6 | `r64 Rdi ->  7
   | `r64 R8  ->  8 | `r64 R9  ->  9 | `r64 R10 -> 10 | `r64 R11 -> 11 | `r64 R12 -> 12 | `r64 R13 -> 13 | `r64 R14 -> 14 | `r64 R15 -> 15
 
+let r32_to_int = function
+  | Eax ->  0 | Ecx ->  1 | Edx ->  2 | Ebx  ->  3 | Esp ->  4  | Ebp ->  5  | Esi ->  6  | Edi ->  7
+  | R8d ->  8 | R9d ->  9 | R10d-> 10 | R11d -> 11 | R12d -> 12 | R13d -> 13 | R14d -> 14 | R15d -> 15
+
 let r64_to_int = function
   | Rax ->  0 | Rcx ->  1 | Rdx ->  2 | Rbx ->  3 | Rsp ->  4 | Rbp ->  5 | Rsi ->  6 | Rdi ->  7
   | R8  ->  8 | R9  ->  9 | R10 -> 10 | R11 -> 11 | R12 -> 12 | R13 -> 13 | R14 -> 14 | R15 -> 15
@@ -64,6 +68,7 @@ let make_rex w r x b = let low_bits =
   if (low_bits <> 0) then Some (0x40 lor low_bits) else None
 
 let prefix_op_size_override = 0x66
+let prefix_addr_size_override = 0x67
 
 let make_rex_bx base_num index_num =
   let rex_bit_b, rex_bit_x = (base_num >= 8), (index_num >= 8) in
@@ -131,6 +136,12 @@ let validate_mem = function
   | R64Ptr { base=Some _; index = Some Rsp; scale=Some scale; offset=_} when scale <> 1 ->
       raise (Invalid_encoding "Cannot scale the RSP register")
 
+  | R32Ptr { base=Some Esp; index=Some Esp; scale=_; offset=_} ->
+      raise (Invalid_encoding "ESP is not valid in the index field (the base field is also ESP so they cannot be swapped)")
+
+  | R32Ptr { base=Some _; index = Some Esp; scale=Some scale; offset=_} when scale <> 1 ->
+      raise (Invalid_encoding "Cannot scale the ESP register")
+
   | m -> m
 
 let get_modbits_and_offset base offset = 
@@ -141,7 +152,7 @@ let get_modbits_and_offset base offset =
     | None           -> None ) in
       match base, (resolve_ofs offset) with
         (* rbp or r13 in base with mod = 0 signals no base - so we need to set mod = 1 and include an offset *)
-        | Some Rbp, None | Some R13, None -> 1, [0]
+        | Some 5, None | Some 13, None -> 1, [0]
 
         (* any other reg with no offset - set mod = 0 and don't include an offset *)
         | Some _, None -> 0, []

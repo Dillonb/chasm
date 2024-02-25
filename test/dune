@@ -9,5 +9,5 @@
 
 (test
  (name test_chasm)
- (modules test_chasm)
+ (modules test_chasm test_utils)
  (libraries chasm capstone))
