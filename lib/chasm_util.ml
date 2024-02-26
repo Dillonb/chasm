@@ -127,19 +127,19 @@ let make_sib_opts scale index base = match scale, index, base with
     | scale, index, base -> Some (make_sib 
       (get_scale_bits (Option.value scale ~default:1)) 
       (Option.value index ~default:4) 
-      (Option.value base  ~default:4)) (* TODO: is this default base value correct? *)
+      (Option.value base  ~default:5))
 
 let validate_mem = function
   | R64Ptr { base=Some Rsp; index=Some Rsp; scale=_; offset=_} ->
       raise (Invalid_encoding "RSP is not valid in the index field (the base field is also RSP so they cannot be swapped)")
 
-  | R64Ptr { base=Some _; index = Some Rsp; scale=Some scale; offset=_} when scale <> 1 ->
+  | R64Ptr { base=_; index = Some Rsp; scale=Some scale; offset=_} when scale <> 1 ->
       raise (Invalid_encoding "Cannot scale the RSP register")
 
   | R32Ptr { base=Some Esp; index=Some Esp; scale=_; offset=_} ->
       raise (Invalid_encoding "ESP is not valid in the index field (the base field is also ESP so they cannot be swapped)")
 
-  | R32Ptr { base=Some _; index = Some Esp; scale=Some scale; offset=_} when scale <> 1 ->
+  | R32Ptr { base=_; index = Some Esp; scale=Some scale; offset=_} when scale <> 1 ->
       raise (Invalid_encoding "Cannot scale the ESP register")
 
   | m -> m
@@ -166,4 +166,4 @@ let get_modbits_and_offset base offset =
         | None, Some (`imm32 offset) -> 2, list_of_int32_le offset
 
         (* no base and no offset - mod = 0, no offset*)
-        | None, None -> 0, []
+        | None, None -> 0, list_of_int32_le (Int32.of_int 0)

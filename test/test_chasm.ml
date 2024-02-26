@@ -162,6 +162,19 @@ let indirect_reg_plus_reg_testcases instr instr_name ptr_size regs =
     | reg1, reg2 -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [" ^ (r_to_str reg1) ^ " + " ^ (r_to_str reg2) ^ "]")
     regs
 
+let indirect_reg_scaled_testcases instr instr_name ptr_size regs =
+  let ptr_func, regs, sp = match ptr_size, regs with
+    | M16, `r32 regs -> word_ptr_of_reg_scaled, regs, esp
+    | M64, `r32 regs -> qword_ptr_of_reg_scaled, regs, esp
+    | M16, `r64 regs -> word_ptr_of_reg_scaled, regs, rsp
+    | M64, `r64 regs -> qword_ptr_of_reg_scaled, regs, rsp in
+  List.concat_map (fun scale ->
+    List.map (fun reg -> match reg with
+    | r when (r == sp && scale <> 1) || (not (is_valid_scale scale)) -> (instr (ptr_func reg scale)), instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [" ^ (r_to_str reg) ^ "*" ^ string_of_int scale ^ "] *INVALID*"
+    | _ when scale == 1 -> (instr (ptr_func reg scale)), instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [" ^ (r_to_str reg) ^ "]"
+    | _ -> (instr (ptr_func reg scale)), instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [" ^ (r_to_str reg) ^ "*" ^ string_of_int scale ^ "]"
+    ) regs
+  ) scale_values
 
 let indirect_reg_plus_reg_times_scale_testcases instr instr_name ptr_size regs =
   let ptr_func, regs, sp = match ptr_size, regs with
@@ -188,7 +201,7 @@ let indirect_reg_plus_reg_times_scale_testcases instr instr_name ptr_size regs =
               | base, index, scale -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [" ^ (r_to_str base) ^ " + " ^ (r_to_str index) ^ "*" ^ (string_of_int scale) ^"]"
         ) regs) scale_values
 
-let indirect_r64_plus_offset_testcases instr instr_name ptr_size regs =
+let indirect_reg_plus_offset_testcases instr instr_name ptr_size regs =
   let ptr_func, regs = match ptr_size, regs with
     | M16, `r32 regs -> word_ptr_of_reg_plus_offset, regs
     | M64, `r32 regs -> qword_ptr_of_reg_plus_offset, regs
@@ -216,7 +229,7 @@ let indirect_r64_plus_r64_plus_offset_testcases instr instr_name ptr_size regs =
       regs
   ) offset_values
 
-let indirect_r64_plus_r64_times_scale_plus_offset_testcases instr instr_name ptr_size regs =
+let indirect_reg_plus_reg_times_scale_plus_offset_testcases instr instr_name ptr_size regs =
   let ptr_func, regs, sp = match ptr_size, regs with
     | M16, `r32 regs -> word_ptr_of_reg_plus_reg_scaled_plus_offset, regs, esp
     | M64, `r32 regs -> qword_ptr_of_reg_plus_reg_scaled_plus_offset, regs, esp
@@ -273,35 +286,38 @@ validate_testcases push_r64_testcases;
 
 validate_testcases (indirect_r64_testcases push "push" M16 (`r64 registers_64));
 validate_testcases (indirect_r64_testcases push "push" M64 (`r64 registers_64));
-
 validate_testcases (indirect_r64_testcases push "push" M16 (`r32 registers_32));
 validate_testcases (indirect_r64_testcases push "push" M64 (`r32 registers_32));
 
 validate_testcases (indirect_reg_plus_reg_testcases push "push" M16 (`r64 registers_64));
 validate_testcases (indirect_reg_plus_reg_testcases push "push" M64 (`r64 registers_64));
-
 validate_testcases (indirect_reg_plus_reg_testcases push "push" M16 (`r32 registers_32));
 validate_testcases (indirect_reg_plus_reg_testcases push "push" M64 (`r32 registers_32));
+
+validate_testcases (indirect_reg_scaled_testcases push "push" M16 (`r64 registers_64));
+validate_testcases (indirect_reg_scaled_testcases push "push" M64 (`r64 registers_64));
+validate_testcases (indirect_reg_scaled_testcases push "push" M16 (`r32 registers_32));
+validate_testcases (indirect_reg_scaled_testcases push "push" M64 (`r32 registers_32));
 
 validate_testcases (indirect_reg_plus_reg_times_scale_testcases push "push" M16 (`r64 registers_64));
 validate_testcases (indirect_reg_plus_reg_times_scale_testcases push "push" M64 (`r64 registers_64));
 validate_testcases (indirect_reg_plus_reg_times_scale_testcases push "push" M16 (`r32 registers_32));
 validate_testcases (indirect_reg_plus_reg_times_scale_testcases push "push" M64 (`r32 registers_32));
 
-validate_testcases (indirect_r64_plus_offset_testcases push "push" M16 (`r64 registers_64));
-validate_testcases (indirect_r64_plus_offset_testcases push "push" M64 (`r64 registers_64));
-validate_testcases (indirect_r64_plus_offset_testcases push "push" M16 (`r32 registers_32));
-validate_testcases (indirect_r64_plus_offset_testcases push "push" M64 (`r32 registers_32));
+validate_testcases (indirect_reg_plus_offset_testcases push "push" M16 (`r64 registers_64));
+validate_testcases (indirect_reg_plus_offset_testcases push "push" M64 (`r64 registers_64));
+validate_testcases (indirect_reg_plus_offset_testcases push "push" M16 (`r32 registers_32));
+validate_testcases (indirect_reg_plus_offset_testcases push "push" M64 (`r32 registers_32));
 
 validate_testcases (indirect_r64_plus_r64_plus_offset_testcases push "push" M16 (`r64 registers_64));
 validate_testcases (indirect_r64_plus_r64_plus_offset_testcases push "push" M64 (`r64 registers_64));
 validate_testcases (indirect_r64_plus_r64_plus_offset_testcases push "push" M16 (`r32 registers_32));
 validate_testcases (indirect_r64_plus_r64_plus_offset_testcases push "push" M64 (`r32 registers_32));
 
-validate_testcases (indirect_r64_plus_r64_times_scale_plus_offset_testcases push "push" M16 (`r64 registers_64));
-validate_testcases (indirect_r64_plus_r64_times_scale_plus_offset_testcases push "push" M64 (`r64 registers_64));
-validate_testcases (indirect_r64_plus_r64_times_scale_plus_offset_testcases push "push" M16 (`r32 registers_32));
-validate_testcases (indirect_r64_plus_r64_times_scale_plus_offset_testcases push "push" M64 (`r32 registers_32));
+validate_testcases (indirect_reg_plus_reg_times_scale_plus_offset_testcases push "push" M16 (`r64 registers_64));
+validate_testcases (indirect_reg_plus_reg_times_scale_plus_offset_testcases push "push" M64 (`r64 registers_64));
+validate_testcases (indirect_reg_plus_reg_times_scale_plus_offset_testcases push "push" M16 (`r32 registers_32));
+validate_testcases (indirect_reg_plus_reg_times_scale_plus_offset_testcases push "push" M64 (`r32 registers_32));
 
 Printf.printf "Passed %d testcases!\n" !num_success;
 if (!num_failures > 0) then raise (Failure (Printf.sprintf "Failed %d test case%s!" !num_failures (if !num_failures == 1 then "" else "s"))) else ()

@@ -19,6 +19,14 @@ let qword_ptr_of_reg_plus_reg base index = match base, index with
   | `r64 b, `r64 i -> qword_ptr_of_r64_plus_r64 (`r64 b) (`r64 i)
   | _ -> raise (Invalid_encoding "Both regs must be the same type")
 
+let word_ptr_of_reg_scaled base scale = match base with
+  | `r32 b -> word_ptr_of_r32_scaled (`r32 b) scale
+  | `r64 b -> word_ptr_of_r64_scaled (`r64 b) scale
+
+let qword_ptr_of_reg_scaled base scale = match base with
+  | `r32 b -> qword_ptr_of_r32_scaled (`r32 b) scale
+  | `r64 b -> qword_ptr_of_r64_scaled (`r64 b) scale
+
 let word_ptr_of_reg_plus_reg_scaled base index scale = match base, index with
   | `r32 base, `r32 index -> word_ptr_of_r32_plus_r32_scaled (`r32 base) (`r32 index) scale
   | `r64 base, `r64 index -> word_ptr_of_r64_plus_r64_scaled (`r64 base) (`r64 index) scale
