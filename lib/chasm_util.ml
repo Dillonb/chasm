@@ -98,11 +98,6 @@ let (+?) o l = match o with
   | Some i -> i :: l
   | None -> l
 
-(** appends an optional to a list *)
-let (@?) l o = match o with
-  | Some i -> l @ [i]
-  | None -> l
-
 let get_scale_bits = function
   | 1 -> 0
   | 2 -> 1

@@ -109,7 +109,7 @@ let assemble_push_mem size mem =
           let rmbits = if (Option.is_some sib) then 4 else (Option.get base_num) in (* 4 signals a present SIB byte. Otherwise, a base reg is required. *)
             let modrm = make_modrm modbits 6 rmbits in
               let size_prefix = if (size = M16) then (Some prefix_op_size_override) else None in
-                make_bytes (prefix +? (size_prefix +? (rex +? ([0xFF; modrm] @? sib) @ offset))) in
+                make_bytes (prefix +? (size_prefix +? (rex +? (0xff :: (modrm :: (sib +? offset)))))) in
   match validate_mem mem with 
     | R64Ptr m ->
       let base_num, index_num = (Option.map r64_to_int m.base), (Option.map r64_to_int m.index) in
