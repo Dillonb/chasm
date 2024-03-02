@@ -1,5 +1,5 @@
 with import <nixpkgs> {};
 stdenv.mkDerivation {
     name = "chasm-dev";
-    buildInputs = [ ocaml capstone ];
+    buildInputs = [ ocaml opam capstone ];
 }
