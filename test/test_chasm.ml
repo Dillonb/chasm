@@ -1,14 +1,20 @@
 open Chasm
 open Chasm__Chasm_types
+open Chasm__Chasm_util
 open Chasm__Chasm_exceptions
 open Stdint
 open Test_utils
 
 let print_success = false
 
-let bytes_to_hex_string bytes =
-  let fold_fn c s = Printf.sprintf "%02X" (int_of_char c) :: s in
-    String.concat " " (Bytes.fold_right fold_fn bytes [])
+let int_to_hex = function
+  | i when (is_int8 i) || (is_uint8 i) -> Printf.sprintf "%02X" (i land 0xFF)
+  | i -> raise (Invalid_argument ("Integer " ^ (string_of_int i) ^ " is not a valid byte."))
+
+let rec int_list_to_hex_string = function
+  | [] -> ""
+  | x :: [] -> int_to_hex x
+  | x :: xs -> (int_to_hex x) ^ " " ^ int_list_to_hex_string(xs)
 
 let registers_16 = [ ax; cx; dx; bx; si; di; sp; bp; r8w; r9w; r10w; r11w; r12w; r13w; r14w; r15w ]
 let registers_32 = [ eax; ecx; edx; ebx; esi; edi; esp; ebp; r8d; r9d; r10d; r11d; r12d; r13d; r14d; r15d ]
@@ -138,13 +144,19 @@ let mem_size_16_64_to_ptr_str = function
 let push_r64_testcases = List.map (fun reg -> (push reg), "push " ^ (rq_to_str reg)) registers_64
 let push_r16_testcases = List.map (fun reg -> (push reg), "push " ^ (rw_to_str reg)) registers_16
 
-let indirect_r64_testcases instr instr_name ptr_size regs =
+let indirect_reg_testcases instr instr_name ptr_size regs =
   let ptr_func, regs = match ptr_size, regs with
     | M16, `r64 regs -> word_ptr_of_reg,  regs
     | M64, `r64 regs -> qword_ptr_of_reg, regs
     | M16, `r32 regs -> word_ptr_of_reg,  regs
     | M64, `r32 regs -> qword_ptr_of_reg, regs in
     List.map (fun reg -> (instr (ptr_func reg)), instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [" ^ (r_to_str reg) ^ "]") regs
+
+let indirect_reg_m64_testcases instr instr_name regs =
+  let ptr_func, regs = match regs with
+    | `r64 regs -> qword_ptr_of_reg, regs
+    | `r32 regs -> qword_ptr_of_reg, regs in
+    List.map (fun reg -> (instr (ptr_func reg)), instr_name ^ " qword ptr [" ^ (r_to_str reg) ^ "]") regs
 
 let indirect_reg_plus_reg_testcases instr instr_name ptr_size regs =
   let ptr_func, regs, sp = match ptr_size, regs with
@@ -259,7 +271,10 @@ let num_success = ref 0
 let inc_failures () = num_failures := !num_failures + 1
 let inc_success () = num_success := !num_success + 1
 let safe_assemble instruction =
-  try Ok(assemble instruction) with
+  let do_assemble instruction =
+    let b = new chasm_block in
+      b#append instruction; b#as_int_list in
+  try Ok(do_assemble instruction) with
   | ex -> Error ex
 let safe_disassemble asm =
   try Ok(Capstone.disassemble asm) with
@@ -270,10 +285,10 @@ let rec validate_testcases = function
   | (instruction, expected_mnemonic) :: remaining ->
     let _ = match safe_assemble instruction with
     | Ok asm -> (
-      match safe_disassemble asm with
-      | Ok(disassembly) when (disassembly = expected_mnemonic) -> inc_success (); if print_success then Printf.printf "%s OK!\t%s\n" expected_mnemonic (bytes_to_hex_string asm) else ()
-      | Ok(disassembly) -> print_endline (Printf.sprintf "%s FAILED! Assembled to %s - which disassembles to %s" expected_mnemonic (bytes_to_hex_string asm) disassembly); inc_failures ()
-      | Error ex -> Printf.printf "%s assembled to %s - Failed to disassemble with exception: %s\n" expected_mnemonic (bytes_to_hex_string asm) (Printexc.to_string ex); inc_failures ()
+      match safe_disassemble (make_bytes asm) with
+      | Ok(disassembly) when (disassembly = expected_mnemonic) -> inc_success (); if print_success then Printf.printf "%s OK!\t%s\n" expected_mnemonic (int_list_to_hex_string asm) else ()
+      | Ok(disassembly) -> print_endline (Printf.sprintf "%s FAILED! Assembled to %s - which disassembles to %s" expected_mnemonic (int_list_to_hex_string asm) disassembly); inc_failures ()
+      | Error ex -> Printf.printf "%s assembled to %s - Failed to disassemble with exception: %s\n" expected_mnemonic (int_list_to_hex_string asm) (Printexc.to_string ex); inc_failures ()
     )
     | Error (Invalid_encoding _) when String.ends_with ~suffix:"*INVALID*" expected_mnemonic -> inc_success (); if print_success then Printf.printf "%s OK!\n" expected_mnemonic
     | Error ex -> Printf.printf "%s Failed to assemble with exception: %s\n" expected_mnemonic (Printexc.to_string ex); inc_failures ()
@@ -284,10 +299,13 @@ validate_testcases push_imm_testcases;
 validate_testcases push_r16_testcases;
 validate_testcases push_r64_testcases;
 
-validate_testcases (indirect_r64_testcases push "push" M16 (`r64 registers_64));
-validate_testcases (indirect_r64_testcases push "push" M64 (`r64 registers_64));
-validate_testcases (indirect_r64_testcases push "push" M16 (`r32 registers_32));
-validate_testcases (indirect_r64_testcases push "push" M64 (`r32 registers_32));
+validate_testcases (indirect_reg_testcases push "push" M16 (`r64 registers_64));
+validate_testcases (indirect_reg_testcases push "push" M64 (`r64 registers_64));
+validate_testcases (indirect_reg_testcases push "push" M16 (`r32 registers_32));
+validate_testcases (indirect_reg_testcases push "push" M64 (`r32 registers_32));
+
+validate_testcases (indirect_reg_m64_testcases jmp "jmp" (`r32 registers_32));
+validate_testcases (indirect_reg_m64_testcases jmp "jmp" (`r64 registers_32));
 
 validate_testcases (indirect_reg_plus_reg_testcases push "push" M16 (`r64 registers_64));
 validate_testcases (indirect_reg_plus_reg_testcases push "push" M64 (`r64 registers_64));
@@ -321,3 +339,26 @@ validate_testcases (indirect_reg_plus_reg_times_scale_plus_offset_testcases push
 
 Printf.printf "Passed %d testcases!\n" !num_success;
 if (!num_failures > 0) then raise (Failure (Printf.sprintf "Failed %d test case%s!" !num_failures (if !num_failures == 1 then "" else "s"))) else ()
+
+let () =
+let expected = "0000000000000000 push rax\n\
+0000000000000001 push qword ptr [eax]\n\
+0000000000000004 jmp 1\n\
+0000000000000006 push qword ptr [eax]\n\
+0000000000000009 jmp 1\n\
+000000000000000E jmp 0x15\n\
+0000000000000010 jmp 0x15\n\
+0000000000000015 push 0xabcdef\n" in
+  let b = new chasm_block in
+    b#push rax;
+    b#label "back_label";
+    b#push (qword_ptr_of_r32 eax);
+    b#jmp (to_label "back_label");
+    b#push (qword_ptr_of_r32 eax);
+    b#jmp (to_label_long "back_label");
+    b#jmp (to_label "forward_label");
+    b#jmp (to_label_long "forward_label");
+    b#label "forward_label";
+    b#push (imm32_i 0xABCDEF);
+    let actual = (Capstone.disassemble_all (make_bytes b#as_int_list)) in
+      if (actual <> expected) then (print_endline ("Actual:\n" ^ actual ^ "\nExpected:\n" ^ expected); raise (Failure (Printf.sprintf "jmp to label test failed. Expected:\n[%s]\nActual:\n[%s]\n" expected actual))) else ()

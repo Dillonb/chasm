@@ -1,5 +1,6 @@
 open Chasm_types
 open Chasm_util
+open Chasm_exceptions
 open Stdint
 
 let al   = `r8 Al
@@ -100,16 +101,17 @@ let imm32_i x = imm32 (Int32.of_int x)
 let imm64 x = `imm64 x
 
 let push x = Push x
+let jmp x = Jmp x
 
-let assemble_push_mem size mem = 
+let assemble_modrm_op opbyte regbits size mem = 
   let do_assemble m base_num index_num prefix = 
     let rex = make_rex_bx_opts base_num index_num in
       let modbits, offset = get_modbits_and_offset base_num m.offset in
         let sib = make_sib_opts m.scale index_num base_num in 
           let rmbits = if (Option.is_some sib) then 4 else (Option.get base_num) in (* 4 signals a present SIB byte. Otherwise, a base reg is required. *)
-            let modrm = make_modrm modbits 6 rmbits in
+            let modrm = make_modrm modbits regbits rmbits in
               let size_prefix = if (size = M16) then (Some prefix_op_size_override) else None in
-                make_bytes (prefix +? (size_prefix +? (rex +? (0xff :: (modrm :: (sib +? offset)))))) in
+                (prefix +? (size_prefix +? (rex +? (opbyte :: (modrm :: (sib +? offset)))))) in
   match validate_mem mem with 
     | R64Ptr m ->
       let base_num, index_num = (Option.map r64_to_int m.base), (Option.map r64_to_int m.index) in
@@ -118,21 +120,60 @@ let assemble_push_mem size mem =
       let base_num, index_num = (Option.map r32_to_int m.base), (Option.map r32_to_int m.index) in
         do_assemble m base_num index_num (Some prefix_addr_size_override)
 
-let rec assemble = function
+type needs_label = {
+    instruction: instruction;
+
+    (* offset from where the final relative offset should be calculated *)
+    offset: int;
+
+    (* length of this instruction *)
+    length: int;
+}
+
+type assembled_instruction = 
+  | Complete of int list
+  | NeedsLabel of needs_label
+
+let resolve_label label instruction_offset labels = 
+  let maybe_label_offset = Hashtbl.find_opt labels label in
+  Option.map (fun label_offset -> label_offset - instruction_offset) maybe_label_offset
+
+let rec assemble instruction instruction_offset labels = match instruction with
   | Push (`r16 r)   -> let reg_num = rw_to_int(`r16 r) in
                         let rex = make_rex_b reg_num in
-                          make_bytes (prefix_op_size_override :: rex +? [0x50 + (reg_num land 7)])
+                          Complete (prefix_op_size_override :: rex +? [0x50 + (reg_num land 7)])
 
   | Push (`r64 r)   -> let reg_num = rq_to_int(`r64 r) in
                         let rex = make_rex_b reg_num in
-                          make_bytes (rex +? [0x50 + (reg_num land 7)])
+                          Complete (rex +? [0x50 + (reg_num land 7)])
 
-  | Push (`imm8  i) -> make_bytes [0x6A; Int8.to_int i]
-  | Push (`imm16 i) -> make_bytes ([0x66; 0x68] @ (list_of_int16_le i))
-  | Push (`imm32 i) -> make_bytes (0x68 :: (list_of_int32_le i))
-  | Push (`imm i)   -> assemble (Push (int_to_sized_imm i))
-  | Push (`mem16 m) -> assemble_push_mem M16 m
-  | Push (`mem64 m) -> assemble_push_mem M64 m
+  | Push (`imm8  i) -> Complete [0x6A; Int8.to_int i]
+  | Push (`imm16 i) -> Complete ([0x66; 0x68] @ (list_of_int16_le i))
+  | Push (`imm32 i) -> Complete (0x68 :: (list_of_int32_le i))
+  | Push (`imm i)   -> assemble (Push (int_to_sized_imm i)) instruction_offset labels
+  | Push (`mem16 m) -> Complete (assemble_modrm_op 0xFF 6 M16 m)
+  | Push (`mem64 m) -> Complete (assemble_modrm_op 0xFF 6 M64 m)
+
+  | Jmp (`imm8 i) -> Complete [0xEB; Int8.to_int i]
+  | Jmp (`imm32 i) -> Complete (0xE9 :: (list_of_int32_le i))
+
+  | Jmp (`mem64 m) -> Complete (assemble_modrm_op 0xFF 4 M64 m)
+
+  | Jmp (`short_label label) -> (
+    let jump_origin_offset = instruction_offset + 2 in
+      match resolve_label label (jump_origin_offset) labels with
+      | Some jump_offset when is_int8 jump_offset -> assemble (Jmp (imm8_i jump_offset)) jump_origin_offset labels
+      | Some jump_offset -> raise (Invalid_encoding ("Label is too far away (offset is " ^ (string_of_int jump_offset) ^ " bytes) for an 8 bit offset")) 
+      | None -> NeedsLabel { instruction=instruction; offset=instruction_offset; length=2; }
+  )
+    
+  | Jmp (`long_label label) -> (
+    let jump_origin_offset = instruction_offset + 5 in
+      match resolve_label label jump_origin_offset labels with
+      | Some jump_offset when is_int32 jump_offset -> assemble (Jmp (imm32_i jump_offset)) jump_origin_offset labels
+      | Some jump_offset -> raise (Invalid_encoding ("Label is too far away (offset is " ^ (string_of_int jump_offset) ^ " bytes) for a 32 bit offset")) 
+      | None -> NeedsLabel { instruction=instruction; offset=instruction_offset; length=5; }
+  )
 
 
 let offset_of_int = function
@@ -267,5 +308,40 @@ let qword_ptr_of_r32_plus_r32 base index = qword_ptr_of_r32_plus_r32_plus_offset
 let qword_ptr_of_r32_plus_r32_scaled base index scale = qword_ptr_of_r32_plus_r32_scaled_plus_offset base index scale 0
 let qword_ptr_of_r32_scaled base scale = qword_ptr_of_r32_scaled_plus_offset base scale 0
 
-let assemble_list instrs = let asm = List.map assemble instrs in
-  Bytes.concat Bytes.empty asm
+let to_label name = `short_label name
+let to_label_long name = `long_label name
+
+(* Instructions that can be assembled are assembled upfront.
+   Instructions that can't are marked with a type describing why. *)
+
+let ins_length = function
+  | Complete l -> List.length l
+  | NeedsLabel { instruction=_; offset=_; length=l } -> l
+
+let finalize i labels = match i with
+  | Complete l -> l
+  | NeedsLabel { instruction=ins; offset=ofs; length=_ } -> (let x = assemble ins ofs labels in match x with
+    | Complete l -> l
+    | _ -> raise (Not_implemented "Unable to finalize instruction! Is there an unbound label?"))
+  
+class chasm_block =
+  object (self)
+    val l = ref []
+
+    (* Keeps track of the current offset from the base address *)
+    val len = ref 0
+
+    val labels = Hashtbl.create 5
+
+    method label (name: string) = Hashtbl.add labels name !len
+
+    method append instr =
+      let asm = assemble instr !len labels in
+        len := !len + ins_length asm;
+        l := asm :: !l
+
+    method as_int_list = List.concat ( List.rev_map (fun ins -> finalize ins labels) !l )
+
+    method push x = self#append (Push x)
+    method jmp x = self#append (Jmp x)
+  end

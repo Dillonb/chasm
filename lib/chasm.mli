@@ -182,5 +182,14 @@ val qword_ptr_of_r32_scaled_plus_offset: [ `r32 of r32 ] -> int -> int -> [> `me
 
 val push: push_type -> instruction
 
-val assemble: instruction -> bytes
-val assemble_list: instruction list -> bytes
+val to_label : string -> [> `short_label of string ]
+val to_label_long : string -> [> `long_label of string ]
+val jmp: jmp_type -> instruction
+
+class chasm_block : object
+  method append : Chasm_types.instruction -> unit
+  method as_int_list : int list
+  method jmp : Chasm_types.jmp_type -> unit
+  method label : string -> unit
+  method push : Chasm_types.push_type -> unit
+end

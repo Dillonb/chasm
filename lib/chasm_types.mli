@@ -25,5 +25,16 @@ type push_type = [ `r16 of r16   | `r64 of r64
                  | `mem16 of mem | `mem64 of mem
                  | `imm8 of int8 | `imm16 of int16 | `imm32 of int32 | `imm of int ]
 
+(* Note: far jumps are not supported *)
+type jmp_type = [ `imm8 of int8 | `imm32 of int32
+                | `mem64 of mem 
+                | `long_label of string | `short_label of string ]
+
 type instruction =
     | Push of push_type
+    | Jmp of jmp_type
+
+
+type asm_line =
+    | Instruction of instruction
+    | Label of string

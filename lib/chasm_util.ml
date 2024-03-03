@@ -35,6 +35,11 @@ let is_int8 x =
   let max = Int8.to_int Int8.max_int in
     ((x >= min) && (x <= max))
 
+let is_uint8 x =
+  let min = Uint8.to_int Uint8.min_int in
+  let max = Uint8.to_int Uint8.max_int in
+    ((x >= min) && (x <= max))
+
 let is_int16 x =
   let min = Int16.to_int Int16.min_int in
   let max = Int16.to_int Int16.max_int in
