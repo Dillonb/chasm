@@ -120,14 +120,24 @@ let assemble_modrm_op opbyte regbits size mem =
       let base_num, index_num = (Option.map r32_to_int m.base), (Option.map r32_to_int m.index) in
         do_assemble m base_num index_num (Some prefix_addr_size_override)
 
-type needs_label = {
-    instruction: instruction;
+type imm_size =
+ | Imm8
+ | Imm32
 
-    (* offset from where the final relative offset should be calculated *)
+type needs_label = {
+    data: int list;
+    label: string;
+
+    (* offset of the instruction in the code *)
     offset: int;
 
-    (* length of this instruction *)
-    length: int;
+    (* Offset from which the relative offset should be calculated from *)
+    relative_offset_base: int;
+
+    (* offset within the instruction of the immediate to be rewritten later *)
+    imm_offset: int;
+    (* size of the immediate *)
+    imm_size: imm_size;
 }
 
 type assembled_instruction = 
@@ -164,7 +174,7 @@ let rec assemble instruction instruction_offset labels = match instruction with
       match resolve_label label (jump_origin_offset) labels with
       | Some jump_offset when is_int8 jump_offset -> assemble (Jmp (imm8_i jump_offset)) jump_origin_offset labels
       | Some jump_offset -> raise (Invalid_encoding ("Label is too far away (offset is " ^ (string_of_int jump_offset) ^ " bytes) for an 8 bit offset")) 
-      | None -> NeedsLabel { instruction=instruction; offset=instruction_offset; length=2; }
+      | None -> NeedsLabel { data=[0xEB; 0]; label=label; offset=instruction_offset; relative_offset_base=jump_origin_offset; imm_size=Imm8; imm_offset=1;}
   )
     
   | Jmp (`long_label label) -> (
@@ -172,7 +182,7 @@ let rec assemble instruction instruction_offset labels = match instruction with
       match resolve_label label jump_origin_offset labels with
       | Some jump_offset when is_int32 jump_offset -> assemble (Jmp (imm32_i jump_offset)) jump_origin_offset labels
       | Some jump_offset -> raise (Invalid_encoding ("Label is too far away (offset is " ^ (string_of_int jump_offset) ^ " bytes) for a 32 bit offset")) 
-      | None -> NeedsLabel { instruction=instruction; offset=instruction_offset; length=5; }
+      | None -> NeedsLabel { data=[0xE9; 0; 0; 0; 0]; label=label; offset=instruction_offset; relative_offset_base=jump_origin_offset; imm_size=Imm32; imm_offset=1;}
   )
 
 
@@ -311,36 +321,70 @@ let qword_ptr_of_r32_scaled base scale = qword_ptr_of_r32_scaled_plus_offset bas
 let to_label name = `short_label name
 let to_label_long name = `long_label name
 
-(* Instructions that can be assembled are assembled upfront.
-   Instructions that can't are marked with a type describing why. *)
+let block_initial_buf_size = 16
 
-let ins_length = function
-  | Complete l -> List.length l
-  | NeedsLabel { instruction=_; offset=_; length=l } -> l
+let hashtbl_append t k v =
+  let existing = Hashtbl.find_opt t k in
+    let existing_list = Option.value existing ~default:[] in
+      Hashtbl.replace t k (v :: existing_list)
 
-let finalize i labels = match i with
-  | Complete l -> l
-  | NeedsLabel { instruction=ins; offset=ofs; length=_ } -> (let x = assemble ins ofs labels in match x with
-    | Complete l -> l
-    | _ -> raise (Not_implemented "Unable to finalize instruction! Is there an unbound label?"))
-  
+let int_list_of_bytes b =
+  let rec int_list_of_bytes_internal b len start_offset =
+    if (start_offset >= len) then []
+    else Bytes.get_uint8 b start_offset :: int_list_of_bytes_internal b len (start_offset + 1) 
+  in int_list_of_bytes_internal b (Bytes.length b) 0
+
 class chasm_block =
   object (self)
-    val l = ref []
-
-    (* Keeps track of the current offset from the base address *)
-    val len = ref 0
+    val buf = ref (Bytes.create block_initial_buf_size)
+    val code_len = ref 0
 
     val labels = Hashtbl.create 5
+    val unbound_labels = Hashtbl.create 5
 
-    method label (name: string) = Hashtbl.add labels name !len
+    method has_unbound_labels = Hashtbl.length unbound_labels <> 0
+
+    (* To be called when a new label is added - so that we can be sure that !code_len contains the label's offset. *)
+    method private backpatch bp_data =
+      let label_offset = !code_len in 
+        let relative_offset = label_offset - bp_data.relative_offset_base in
+          match bp_data.imm_size with
+            | Imm8 when is_int8 relative_offset -> Bytes.set_int8 !buf (bp_data.offset + bp_data.imm_offset) relative_offset
+            | Imm8 -> raise (Invalid_encoding ("Label is too far away (offset is " ^ (string_of_int relative_offset) ^ " bytes) for an 8 bit offset"))
+            | Imm32 when is_int32 relative_offset -> Bytes.set_int32_le !buf (bp_data.offset + bp_data.imm_offset) (Int32.of_int relative_offset)
+            | Imm32 -> raise (Invalid_encoding ("Label is too far away (offset is " ^ (string_of_int relative_offset) ^ " bytes) for a 32 bit offset"))
+
+    method label (label_name: string) = 
+      Hashtbl.add labels label_name !code_len;
+      match Hashtbl.find_opt unbound_labels label_name with
+        | Some l -> 
+          List.iter self#backpatch l; 
+          Hashtbl.remove unbound_labels label_name
+        | None -> ()
+
+    method private append_list l = let list_len = List.length l in
+      if (!code_len + list_len > (Bytes.length !buf)) then 
+        buf := Bytes.extend !buf 0 (Bytes.length !buf); (* Double the size of buf *)
+      List.iteri (fun i v -> Bytes.set_uint8 !buf (!code_len + i) v) l; 
+      code_len := !code_len + list_len
 
     method append instr =
-      let asm = assemble instr !len labels in
-        len := !len + ins_length asm;
-        l := asm :: !l
+      let asm = assemble instr !code_len labels in
+        match asm with
+          | Complete l -> self#append_list l
+          | NeedsLabel l -> 
+            hashtbl_append unbound_labels l.label l;
+            self#append_list l.data
 
-    method as_int_list = List.concat ( List.rev_map (fun ins -> finalize ins labels) !l )
+    method private unbound_label_names_str =
+      let seq_names = Hashtbl.to_seq_keys unbound_labels in
+        Seq.fold_left (fun a b -> a ^ "'" ^ b ^ "' ") "Some labels are unbound: " seq_names
+
+    method as_bytes = 
+      if self#has_unbound_labels then raise (Invalid_encoding (self#unbound_label_names_str)) 
+      else Bytes.sub !buf 0 !code_len
+
+    method as_int_list = int_list_of_bytes self#as_bytes
 
     method push x = self#append (Push x)
     method jmp x = self#append (Jmp x)

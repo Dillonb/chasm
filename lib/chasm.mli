@@ -188,7 +188,9 @@ val jmp: jmp_type -> instruction
 
 class chasm_block : object
   method append : Chasm_types.instruction -> unit
+  method has_unbound_labels: bool
   method as_int_list : int list
+  method as_bytes : bytes
   method jmp : Chasm_types.jmp_type -> unit
   method label : string -> unit
   method push : Chasm_types.push_type -> unit

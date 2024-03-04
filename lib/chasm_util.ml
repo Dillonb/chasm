@@ -97,7 +97,6 @@ let rex_b = make_rex false false false true
 let make_bytes l = let b = Bytes.create (List.length l) in
   List.iteri (fun i v -> Bytes.set_uint8 b i v) l; b
 
-
 (** prepends an optional to a list *)
 let (+?) o l = match o with
   | Some i -> i :: l

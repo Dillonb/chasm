@@ -360,5 +360,5 @@ let expected = "0000000000000000 push rax\n\
     b#jmp (to_label_long "forward_label");
     b#label "forward_label";
     b#push (imm32_i 0xABCDEF);
-    let actual = (Capstone.disassemble_all (make_bytes b#as_int_list)) in
+    let actual = (Capstone.disassemble_all b#as_bytes) in
       if (actual <> expected) then (print_endline ("Actual:\n" ^ actual ^ "\nExpected:\n" ^ expected); raise (Failure (Printf.sprintf "jmp to label test failed. Expected:\n[%s]\nActual:\n[%s]\n" expected actual))) else ()
