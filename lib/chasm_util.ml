@@ -92,7 +92,21 @@ let make_sib scale index base =
   ((index land 0b111) lsl 3) lor
   (base land 0b111)
 
-let rex_b = make_rex false false false true
+let rex_b = Option.get (make_rex false false false true)
+let rex_w = Option.get (make_rex true false false false)
+
+let is_uniform_byte_reg = function
+ | `r8 Spl -> true
+ | `r8 Bpl -> true
+ | `r8 Sil -> true
+ | `r8 Dil -> true
+ | _ -> false
+
+let make_rex_reg = function
+  | `r8 r when (is_uniform_byte_reg (`r8 r))-> Some 0x40
+  | `r8 r when (rb_to_int (`r8 r) >= 8)-> (Some rex_b)
+  | _ -> None
+
 
 let make_bytes l = let b = Bytes.create (List.length l) in
   List.iteri (fun i v -> Bytes.set_uint8 b i v) l; b

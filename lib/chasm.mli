@@ -185,6 +185,7 @@ val push: push_type -> instruction
 val to_label : string -> [> `short_label of string ]
 val to_label_long : string -> [> `long_label of string ]
 val jmp: jmp_type -> instruction
+val sub: sub_arg1_type -> sub_arg2_type -> instruction
 
 class chasm_block : object
   method append : Chasm_types.instruction -> unit
@@ -194,4 +195,5 @@ class chasm_block : object
   method jmp : Chasm_types.jmp_type -> unit
   method label : string -> unit
   method push : Chasm_types.push_type -> unit
+  method sub : Chasm_types.sub_arg1_type -> Chasm_types.sub_arg2_type -> unit
 end

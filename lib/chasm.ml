@@ -93,17 +93,18 @@ let rq = function
 
 let imm   x = `imm x
 let imm8  x = `imm8 x
-let imm8_i x = imm8 (Int8.of_int x)
+let imm8_i x = if is_int8 x then imm8 (Int8.of_int x) else raise (Invalid_argument (Printf.sprintf "Invalid imm8: %d valid values are -128-127" x))
 let imm16 x = `imm16 x
-let imm16_i x = imm16 (Int16.of_int x)
+let imm16_i x = if is_int16 x then imm16 (Int16.of_int x) else raise (Invalid_argument (Printf.sprintf "Invalid imm16: %d valid values are -32768-32767" x))
 let imm32 x = `imm32 x
-let imm32_i x = imm32 (Int32.of_int x)
+let imm32_i x = if is_int32 x then imm32 (Int32.of_int x) else raise (Invalid_argument (Printf.sprintf "Invalid imm32: %d valid values are -2147483648-2147483647" x))
 let imm64 x = `imm64 x
 
 let push x = Push x
 let jmp x = Jmp x
+let sub x y = Sub (x,y)
 
-let assemble_modrm_op opbyte regbits size mem = 
+let assemble_modrm_mem_op opbyte regbits size mem = 
   let do_assemble m base_num index_num prefix = 
     let rex = make_rex_bx_opts base_num index_num in
       let modbits, offset = get_modbits_and_offset base_num m.offset in
@@ -119,6 +120,14 @@ let assemble_modrm_op opbyte regbits size mem =
     | R32Ptr m ->
       let base_num, index_num = (Option.map r32_to_int m.base), (Option.map r32_to_int m.index) in
         do_assemble m base_num index_num (Some prefix_addr_size_override)
+
+let assemble_modrm_reg_op opbyte regbits reg =
+  let do_assemble reg_num = 
+    let modrm = make_modrm 3 regbits reg_num in
+      let rex = make_rex_reg reg in
+        rex +? (opbyte :: [modrm]) in
+  match reg with
+    | `r8 r -> do_assemble (rb_to_int (`r8 r))
 
 type imm_size =
  | Imm8
@@ -161,13 +170,13 @@ let rec assemble instruction instruction_offset labels = match instruction with
   | Push (`imm16 i) -> Complete ([0x66; 0x68] @ (list_of_int16_le i))
   | Push (`imm32 i) -> Complete (0x68 :: (list_of_int32_le i))
   | Push (`imm i)   -> assemble (Push (int_to_sized_imm i)) instruction_offset labels
-  | Push (`mem16 m) -> Complete (assemble_modrm_op 0xFF 6 M16 m)
-  | Push (`mem64 m) -> Complete (assemble_modrm_op 0xFF 6 M64 m)
+  | Push (`mem16 m) -> Complete (assemble_modrm_mem_op 0xFF 6 M16 m)
+  | Push (`mem64 m) -> Complete (assemble_modrm_mem_op 0xFF 6 M64 m)
 
   | Jmp (`imm8 i) -> Complete [0xEB; Int8.to_int i]
   | Jmp (`imm32 i) -> Complete (0xE9 :: (list_of_int32_le i))
 
-  | Jmp (`mem64 m) -> Complete (assemble_modrm_op 0xFF 4 M64 m)
+  | Jmp (`mem64 m) -> Complete (assemble_modrm_mem_op 0xFF 4 M64 m)
 
   | Jmp (`short_label label) -> (
     let jump_origin_offset = instruction_offset + 2 in
@@ -185,6 +194,19 @@ let rec assemble instruction instruction_offset labels = match instruction with
       | None -> NeedsLabel { data=[0xE9; 0; 0; 0; 0]; label=label; offset=instruction_offset; relative_offset_base=jump_origin_offset; imm_size=Imm32; imm_offset=1;}
   )
 
+  | Sub(`r8  Al,  `imm8  i) -> Complete [0x2C; Int8.to_int i]
+  | Sub(`r16 Ax,  `imm16 i) -> Complete (prefix_op_size_override :: 0x2D :: (list_of_int16_le i))
+  | Sub(`r32 Eax, `imm32 i) -> Complete (0x2D :: (list_of_int32_le i))
+  | Sub(`r64 Rax, `imm32 i) -> Complete (rex_w :: 0x2D :: (list_of_int32_le i))
+
+  | Sub(`r8 r, `imm8 i) -> Complete ((assemble_modrm_reg_op 0x80 5 (`r8 r)) @ [Int8.to_int i])
+
+  | Sub(`r8  r, `imm i) -> assemble (Sub(`r8  r, imm8_i  i)) instruction_offset labels
+  | Sub(`r16 r, `imm i) -> assemble (Sub(`r16 r, imm16_i i)) instruction_offset labels
+  | Sub(`r32 r, `imm i) -> assemble (Sub(`r32 r, imm32_i i)) instruction_offset labels
+  | Sub(`r64 r, `imm i) -> assemble (Sub(`r64 r, imm32_i i)) instruction_offset labels
+
+  | Sub(_) -> raise (Not_implemented "Unhandled case")
 
 let offset_of_int = function
       | o when o == 0 -> None
@@ -321,8 +343,6 @@ let qword_ptr_of_r32_scaled base scale = qword_ptr_of_r32_scaled_plus_offset bas
 let to_label name = `short_label name
 let to_label_long name = `long_label name
 
-let block_initial_buf_size = 16
-
 let hashtbl_append t k v =
   let existing = Hashtbl.find_opt t k in
     let existing_list = Option.value existing ~default:[] in
@@ -334,6 +354,7 @@ let int_list_of_bytes b =
     else Bytes.get_uint8 b start_offset :: int_list_of_bytes_internal b len (start_offset + 1) 
   in int_list_of_bytes_internal b (Bytes.length b) 0
 
+let block_initial_buf_size = 16
 class chasm_block =
   object (self)
     val buf = ref (Bytes.create block_initial_buf_size)
@@ -388,4 +409,5 @@ class chasm_block =
 
     method push x = self#append (Push x)
     method jmp x = self#append (Jmp x)
+    method sub arg1 arg2 = self#append (Sub (arg1, arg2))
   end

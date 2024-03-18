@@ -98,11 +98,9 @@ let push_imm_testcases = [
   (* same, but with _i helpers*)
   (push (imm8_i 0x12)), "push 0x12";
   (push (imm8_i (-1))), "push -1";
-  (push (imm16_i 0xFFFF)), "push 0xffff";
   (push (imm16_i (-1))), "push 0xffff";
   (push (imm16_i 0x1234)), "push 0x1234";
   (push (imm16_i 0x1000)), "push 0x1000";
-  (push (imm32_i 0xFFFFFFFF)), "push -1";
   (push (imm32_i (-1))), "push -1";
   (push (imm32_i 0x12345678)), "push 0x12345678";
   (push (imm32_i 0x10000000)), "push 0x10000000";
@@ -120,6 +118,30 @@ let push_imm_testcases = [
   (push (imm (-32769))), "push -0x8001"; (* int16 min - 1, should assemble as an imm32 *)
   (push (imm 32767)), "push 0x7fff"; (* int16 max *)
   (push (imm 32768)), "push 0x8000"; (* int16 max + 1, should assemble as an imm32 *)
+]
+
+let temp_sub_testcases = [
+  sub al   (imm8_i 1), "sub al, 1";
+  sub cl   (imm8_i 1), "sub cl, 1";
+  sub dl   (imm8_i 1), "sub dl, 1";
+  sub bl   (imm8_i 1), "sub bl, 1";
+  sub sil  (imm8_i 1), "sub sil, 1";
+  sub dil  (imm8_i 1), "sub dil, 1";
+  sub spl  (imm8_i 1), "sub spl, 1";
+  sub bpl  (imm8_i 1), "sub bpl, 1";
+  sub r8b  (imm8_i 1), "sub r8b, 1";
+  sub r9b  (imm8_i 1), "sub r9b, 1";
+  sub r10b (imm8_i 1), "sub r10b, 1";
+  sub r11b (imm8_i 1), "sub r11b, 1";
+  sub r12b (imm8_i 1), "sub r12b, 1";
+  sub r13b (imm8_i 1), "sub r13b, 1";
+  sub r14b (imm8_i 1), "sub r14b, 1";
+  sub r15b (imm8_i 1), "sub r15b, 1";
+
+  sub al (imm 1),      "sub al, 1";
+  sub ax (imm16_i 1),  "sub ax, 1";
+  sub eax (imm32_i 1), "sub eax, 1";
+  sub rax (imm32_i 1), "sub rax, 1";
 ]
 
 let map_all_combinations f l =
@@ -336,6 +358,8 @@ validate_testcases (indirect_reg_plus_reg_times_scale_plus_offset_testcases push
 validate_testcases (indirect_reg_plus_reg_times_scale_plus_offset_testcases push "push" M64 (`r64 registers_64));
 validate_testcases (indirect_reg_plus_reg_times_scale_plus_offset_testcases push "push" M16 (`r32 registers_32));
 validate_testcases (indirect_reg_plus_reg_times_scale_plus_offset_testcases push "push" M64 (`r32 registers_32));
+
+validate_testcases temp_sub_testcases;
 
 Printf.printf "Passed %d testcases!\n" !num_success;
 if (!num_failures > 0) then raise (Failure (Printf.sprintf "Failed %d test case%s!" !num_failures (if !num_failures == 1 then "" else "s"))) else ()

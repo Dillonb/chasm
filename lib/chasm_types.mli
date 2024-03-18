@@ -30,9 +30,16 @@ type jmp_type = [ `imm8 of int8 | `imm32 of int32
                 | `mem64 of mem 
                 | `long_label of string | `short_label of string ]
 
+type sub_arg1_type = [ `r8 of r8 | `r16 of r16 | `r32 of r32 | `r64 of r64
+                     | `mem8 of mem | `mem16 of mem | `mem32 of mem | `mem64 of mem ]
+
+type sub_arg2_type = [ `r8 of r8 | `r16 of r16 | `r32 of r32 | `r64 of r64
+                     | `imm8 of int8 | `imm16 of int16 | `imm32 of int32 | `imm64 of int64 | `imm of int ]
+
 type instruction =
     | Push of push_type
     | Jmp of jmp_type
+    | Sub of sub_arg1_type*sub_arg2_type
 
 
 type asm_line =
