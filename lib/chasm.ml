@@ -94,10 +94,16 @@ let rq = function
 let imm   x = `imm x
 let imm8  x = `imm8 x
 let imm8_i x = if is_int8 x then imm8 (Int8.of_int x) else raise (Invalid_argument (Printf.sprintf "Invalid imm8: %d valid values are -128-127" x))
+let uimm8  x = `uimm8 x
+let uimm8_i x = if is_uint8 x then uimm8 (Uint8.of_int x) else raise (Invalid_argument (Printf.sprintf "Invalid uimm8: %d valid values are 0-255" x))
 let imm16 x = `imm16 x
 let imm16_i x = if is_int16 x then imm16 (Int16.of_int x) else raise (Invalid_argument (Printf.sprintf "Invalid imm16: %d valid values are -32768-32767" x))
+let uimm16 x = `uimm16 x
+let uimm16_i x = if is_uint16 x then uimm16 (Uint16.of_int x) else raise (Invalid_argument (Printf.sprintf "Invalid uimm16: %d valid values are 0-65535" x))
 let imm32 x = `imm32 x
 let imm32_i x = if is_int32 x then imm32 (Int32.of_int x) else raise (Invalid_argument (Printf.sprintf "Invalid imm32: %d valid values are -2147483648-2147483647" x))
+let uimm32 x = `uimm32 x
+let uimm32_i x = if is_uint32 x then uimm32 (Uint32.of_int x) else raise (Invalid_argument (Printf.sprintf "Invalid uimm32: %d valid values are 0-4294967295" x))
 let imm64 x = `imm64 x
 
 let push x = Push x
@@ -194,14 +200,14 @@ let rec assemble instruction instruction_offset labels = match instruction with
       | None -> NeedsLabel { data=[0xE9; 0; 0; 0; 0]; label=label; offset=instruction_offset; relative_offset_base=jump_origin_offset; imm_size=Imm32; imm_offset=1;}
   )
 
-  | Sub(`r8  Al,  `imm8  i) -> Complete [0x2C; Int8.to_int i]
-  | Sub(`r16 Ax,  `imm16 i) -> Complete (prefix_op_size_override :: 0x2D :: (list_of_int16_le i))
-  | Sub(`r32 Eax, `imm32 i) -> Complete (0x2D :: (list_of_int32_le i))
-  | Sub(`r64 Rax, `imm32 i) -> Complete (rex_w :: 0x2D :: (list_of_int32_le i))
+  | Sub(`r8  Al,  `uimm8 i)  -> Complete [0x2C; Uint8.to_int i]
+  | Sub(`r16 Ax,  `uimm16 i) -> Complete (prefix_op_size_override :: 0x2D :: (list_of_uint16_le i))
+  | Sub(`r32 Eax, `uimm32 i) -> Complete (0x2D :: (list_of_uint32_le i))
+  | Sub(`r64 Rax, `imm32 i)  -> Complete (rex_w :: 0x2D :: (list_of_int32_le i))
 
-  | Sub(`r8 r, `imm8 i) -> Complete ((assemble_modrm_reg_op 0x80 5 (`r8 r)) @ [Int8.to_int i])
+  | Sub(`r8 r, `uimm8 i) -> Complete ((assemble_modrm_reg_op 0x80 5 (`r8 r)) @ [Uint8.to_int i])
 
-  | Sub(`r8  r, `imm i) -> assemble (Sub(`r8  r, imm8_i  i)) instruction_offset labels
+  | Sub(`r8  r, `imm i) -> assemble (Sub(`r8  r, uimm8_i i)) instruction_offset labels
   | Sub(`r16 r, `imm i) -> assemble (Sub(`r16 r, imm16_i i)) instruction_offset labels
   | Sub(`r32 r, `imm i) -> assemble (Sub(`r32 r, imm32_i i)) instruction_offset labels
   | Sub(`r64 r, `imm i) -> assemble (Sub(`r64 r, imm32_i i)) instruction_offset labels

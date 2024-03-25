@@ -44,9 +44,18 @@ let is_int16 x =
   let min = Int16.to_int Int16.min_int in
   let max = Int16.to_int Int16.max_int in
     ((x >= min) && (x <= max))
+
+let is_uint16 x =
+  let min = Uint16.to_int Uint16.min_int in
+  let max = Uint16.to_int Uint16.max_int in
+    ((x >= min) && (x <= max))
 let is_int32 x =
   let min = Int32.to_int Int32.min_int in
   let max = Int32.to_int Int32.max_int in
+    ((x >= min) && (x <= max))
+let is_uint32 x =
+  let min = Uint32.to_int Uint32.min_int in
+  let max = Uint32.to_int Uint32.max_int in
     ((x >= min) && (x <= max))
 
 let int_to_sized_imm = function
@@ -62,7 +71,9 @@ let int_to_sized_imm8_or_imm32 = function
 
 
 let list_of_int16_le x = let x = Int16.to_int x in [ x land 0xFF; (x lsr 8) land 0xFF; ]
+let list_of_uint16_le x = let x = Uint16.to_int x in [ x land 0xFF; (x lsr 8) land 0xFF; ]
 let list_of_int32_le x = let x = Int32.to_int x in [ x land 0xFF; (x lsr 8) land 0xFF; (x lsr 16) land 0xFF; (x lsr 24) land 0xFF ]
+let list_of_uint32_le x = let x = Uint32.to_int x in [ x land 0xFF; (x lsr 8) land 0xFF; (x lsr 16) land 0xFF; (x lsr 24) land 0xFF ]
 
 let int_of_bool b = if b then 1 else 0
 let make_rex w r x b = let low_bits =

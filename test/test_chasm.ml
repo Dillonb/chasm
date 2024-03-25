@@ -16,6 +16,7 @@ let rec int_list_to_hex_string = function
   | x :: [] -> int_to_hex x
   | x :: xs -> (int_to_hex x) ^ " " ^ int_list_to_hex_string(xs)
 
+let registers_8 = [ al; cl; dl; bl; sil; dil; spl; bpl; r8b; r9b; r10b; r11b; r12b; r13b; r14b; r15b ]
 let registers_16 = [ ax; cx; dx; bx; si; di; sp; bp; r8w; r9w; r10w; r11w; r12w; r13w; r14w; r15w ]
 let registers_32 = [ eax; ecx; edx; ebx; esi; edi; esp; ebp; r8d; r9d; r10d; r11d; r12d; r13d; r14d; r15d ]
 let registers_64 = [ rax; rcx; rdx; rbx; rsi; rdi; rsp; rbp; r8; r9; r10; r11; r12; r13; r14; r15 ]
@@ -76,10 +77,30 @@ let rw_to_str = function
 | `r16 R15w -> "r15w"
 | _ -> raise (Invalid_argument "Unknown register passed!")
 
+let rb_to_str = function 
+| `r8 Al   -> "al"
+| `r8 Cl   -> "cl"
+| `r8 Dl   -> "dl"
+| `r8 Bl   -> "bl"
+| `r8 Sil  -> "sil"
+| `r8 Dil  -> "dil"
+| `r8 Spl  -> "spl"
+| `r8 Bpl  -> "bpl"
+| `r8 R8b  -> "r8b"
+| `r8 R9b  -> "r9b"
+| `r8 R10b -> "r10b"
+| `r8 R11b -> "r11b"
+| `r8 R12b -> "r12b"
+| `r8 R13b -> "r13b"
+| `r8 R14b -> "r14b"
+| `r8 R15b -> "r15b"
+| _ -> raise (Invalid_argument "Unknown register passed!")
+
 let r_to_str = function
   | `r64 r -> rq_to_str (`r64 r)
   | `r32 r -> rd_to_str (`r32 r)
   | `r16 r -> rw_to_str (`r16 r)
+  | `r8  r -> rb_to_str (`r8 r)
 
 let push_imm_testcases = [
   (* push immediates *)
@@ -121,26 +142,26 @@ let push_imm_testcases = [
 ]
 
 let temp_sub_testcases = [
-  sub al   (imm8_i 1), "sub al, 1";
-  sub cl   (imm8_i 1), "sub cl, 1";
-  sub dl   (imm8_i 1), "sub dl, 1";
-  sub bl   (imm8_i 1), "sub bl, 1";
-  sub sil  (imm8_i 1), "sub sil, 1";
-  sub dil  (imm8_i 1), "sub dil, 1";
-  sub spl  (imm8_i 1), "sub spl, 1";
-  sub bpl  (imm8_i 1), "sub bpl, 1";
-  sub r8b  (imm8_i 1), "sub r8b, 1";
-  sub r9b  (imm8_i 1), "sub r9b, 1";
-  sub r10b (imm8_i 1), "sub r10b, 1";
-  sub r11b (imm8_i 1), "sub r11b, 1";
-  sub r12b (imm8_i 1), "sub r12b, 1";
-  sub r13b (imm8_i 1), "sub r13b, 1";
-  sub r14b (imm8_i 1), "sub r14b, 1";
-  sub r15b (imm8_i 1), "sub r15b, 1";
+  sub al   (uimm8_i 1), "sub al, 1";
+  sub cl   (uimm8_i 1), "sub cl, 1";
+  sub dl   (uimm8_i 1), "sub dl, 1";
+  sub bl   (uimm8_i 1), "sub bl, 1";
+  sub sil  (uimm8_i 1), "sub sil, 1";
+  sub dil  (uimm8_i 1), "sub dil, 1";
+  sub spl  (uimm8_i 1), "sub spl, 1";
+  sub bpl  (uimm8_i 1), "sub bpl, 1";
+  sub r8b  (uimm8_i 1), "sub r8b, 1";
+  sub r9b  (uimm8_i 1), "sub r9b, 1";
+  sub r10b (uimm8_i 1), "sub r10b, 1";
+  sub r11b (uimm8_i 1), "sub r11b, 1";
+  sub r12b (uimm8_i 1), "sub r12b, 1";
+  sub r13b (uimm8_i 1), "sub r13b, 1";
+  sub r14b (uimm8_i 1), "sub r14b, 1";
+  sub r15b (uimm8_i 1), "sub r15b, 1";
 
   sub al (imm 1),      "sub al, 1";
-  sub ax (imm16_i 1),  "sub ax, 1";
-  sub eax (imm32_i 1), "sub eax, 1";
+  sub ax (uimm16_i 1),  "sub ax, 1";
+  sub eax (uimm32_i 1), "sub eax, 1";
   sub rax (imm32_i 1), "sub rax, 1";
 ]
 
@@ -288,6 +309,14 @@ let indirect_reg_plus_reg_times_scale_plus_offset_testcases instr instr_name ptr
             | base, index, scale -> ins, instr_name ^ " " ^ mem_size_16_64_to_ptr_str ptr_size ^ " [" ^ (r_to_str base) ^ " + " ^ (r_to_str index) ^ "*" ^ (string_of_int scale) ^ string_of_offset offset ^"]"
       ) regs) scale_values) offset_values
 
+let binary_r8_uimm8_testcases instr instr_name =
+  List.concat_map (
+    fun reg -> [
+      (instr reg (uimm8_i 1)), instr_name ^ " " ^ (rb_to_str reg) ^ ", 1";
+      (instr reg (uimm8_i 0xff)), instr_name ^ " " ^ (rb_to_str reg) ^ ", 0xff";
+    ]
+  ) registers_8
+
 let num_failures = ref 0
 let num_success = ref 0
 let inc_failures () = num_failures := !num_failures + 1
@@ -358,6 +387,8 @@ validate_testcases (indirect_reg_plus_reg_times_scale_plus_offset_testcases push
 validate_testcases (indirect_reg_plus_reg_times_scale_plus_offset_testcases push "push" M64 (`r64 registers_64));
 validate_testcases (indirect_reg_plus_reg_times_scale_plus_offset_testcases push "push" M16 (`r32 registers_32));
 validate_testcases (indirect_reg_plus_reg_times_scale_plus_offset_testcases push "push" M64 (`r32 registers_32));
+
+validate_testcases (binary_r8_uimm8_testcases sub "sub");
 
 validate_testcases temp_sub_testcases;
 
