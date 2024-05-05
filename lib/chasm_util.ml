@@ -6,29 +6,35 @@ open Stdint
 let rb_to_int = function
   | `r8 Al  -> 0 | `r8 Cl  -> 1 | `r8 Dl   -> 2  | `r8 Bl   -> 3  | `r8 Spl  -> 4  | `r8 Bpl  -> 5  | `r8 Sil  -> 6  | `r8 Dil  -> 7
   | `r8 R8b -> 8 | `r8 R9b -> 9 | `r8 R10b -> 10 | `r8 R11b -> 11 | `r8 R12b -> 12 | `r8 R13b -> 13 | `r8 R14b -> 14 | `r8 R15b -> 15
+  | _ -> raise (Invalid_argument "Illegal state")
 
 
 let rw_to_int = function
   | `r16 Ax ->  0  | `r16 Cx ->  1  | `r16 Dx ->  2   | `r16 Bx ->  3   | `r16 Sp ->  4   | `r16 Bp ->  5   | `r16 Si ->  6 | `r16 Di ->  7
   | `r16 R8w ->  8 | `r16 R9w ->  9 | `r16 R10w -> 10 | `r16 R11w -> 11 | `r16 R12w -> 12 | `r16 R13w -> 13 | `r16 R14w -> 14 | `r16 R15w -> 15
+  | _ -> raise (Invalid_argument "Illegal state")
 
 
 let rd_to_int = function
   | `r32 Eax ->  0 | `r32 Ecx ->  1 | `r32 Edx  ->  2 | `r32 Ebx ->  3 | `r32 Esp   ->  4 | `r32 Ebp  ->  5 | `r32 Esi  ->  6 | `r32 Edi  ->  7
   | `r32 R8d ->  8 | `r32 R9d ->  9 | `r32 R10d -> 10 | `r32 R11d -> 11 | `r32 R12d -> 12 | `r32 R13d -> 13 | `r32 R14d -> 14 | `r32 R15d -> 15
+  | _ -> raise (Invalid_argument "Illegal state")
 
 
 let rq_to_int = function
   | `r64 Rax ->  0 | `r64 Rcx ->  1 | `r64 Rdx ->  2 | `r64 Rbx ->  3 | `r64 Rsp ->  4 | `r64 Rbp ->  5 | `r64 Rsi ->  6 | `r64 Rdi ->  7
   | `r64 R8  ->  8 | `r64 R9  ->  9 | `r64 R10 -> 10 | `r64 R11 -> 11 | `r64 R12 -> 12 | `r64 R13 -> 13 | `r64 R14 -> 14 | `r64 R15 -> 15
+  | _ -> raise (Invalid_argument "Illegal state")
 
 let r32_to_int = function
   | Eax ->  0 | Ecx ->  1 | Edx ->  2 | Ebx  ->  3 | Esp ->  4  | Ebp ->  5  | Esi ->  6  | Edi ->  7
   | R8d ->  8 | R9d ->  9 | R10d-> 10 | R11d -> 11 | R12d -> 12 | R13d -> 13 | R14d -> 14 | R15d -> 15
+  | _ -> raise (Invalid_argument "Illegal state")
 
 let r64_to_int = function
   | Rax ->  0 | Rcx ->  1 | Rdx ->  2 | Rbx ->  3 | Rsp ->  4 | Rbp ->  5 | Rsi ->  6 | Rdi ->  7
   | R8  ->  8 | R9  ->  9 | R10 -> 10 | R11 -> 11 | R12 -> 12 | R13 -> 13 | R14 -> 14 | R15 -> 15
+  | _ -> raise (Invalid_argument "Illegal state")
 
 let is_int8 x =
   let min = Int8.to_int Int8.min_int in
@@ -38,7 +44,8 @@ let is_int8 x =
 let is_uint8 x =
   let min = Uint8.to_int Uint8.min_int in
   let max = Uint8.to_int Uint8.max_int in
-    ((x >= min) && (x <= max))
+  let result = ((x >= min) && (x <= max)) in
+    print_endline ((string_of_int x) ^ "is a uint8? " ^ (string_of_bool result)); result
 
 let is_int16 x =
   let min = Int16.to_int Int16.min_int in
@@ -70,10 +77,15 @@ let int_to_sized_imm8_or_imm32 = function
   | _ -> raise (Invalid_argument "Int either too large or too small to represent in an immediate!")
 
 
-let list_of_int16_le x = let x = Int16.to_int x in [ x land 0xFF; (x lsr 8) land 0xFF; ]
-let list_of_uint16_le x = let x = Uint16.to_int x in [ x land 0xFF; (x lsr 8) land 0xFF; ]
-let list_of_int32_le x = let x = Int32.to_int x in [ x land 0xFF; (x lsr 8) land 0xFF; (x lsr 16) land 0xFF; (x lsr 24) land 0xFF ]
-let list_of_uint32_le x = let x = Uint32.to_int x in [ x land 0xFF; (x lsr 8) land 0xFF; (x lsr 16) land 0xFF; (x lsr 24) land 0xFF ]
+let list_of_int16_le_i x = [ x land 0xFF; (x lsr 8) land 0xFF; ]
+let list_of_uint16_le_i x = [ x land 0xFF; (x lsr 8) land 0xFF; ]
+let list_of_int32_le_i x = [ x land 0xFF; (x lsr 8) land 0xFF; (x lsr 16) land 0xFF; (x lsr 24) land 0xFF ]
+let list_of_uint32_le_i x = [ x land 0xFF; (x lsr 8) land 0xFF; (x lsr 16) land 0xFF; (x lsr 24) land 0xFF ]
+
+let list_of_int16_le x = list_of_int16_le_i (Int16.to_int x)
+let list_of_uint16_le x = list_of_uint16_le_i (Uint16.to_int x)
+let list_of_int32_le x = list_of_int32_le_i (Int32.to_int x)
+let list_of_uint32_le x = list_of_uint32_le_i (Uint32.to_int x)
 
 let int_of_bool b = if b then 1 else 0
 let make_rex w r x b = let low_bits =
@@ -118,6 +130,11 @@ let make_rex_reg = function
   | `r8 r when (rb_to_int (`r8 r) >= 8)-> (Some rex_b)
   | _ -> None
 
+let combine_rex rex1 rex2 = match rex1, rex2 with
+  | None, None -> None
+  | None, Some x -> Some x
+  | Some x, None -> Some x
+  | Some x, Some y -> Some (x lor y)
 
 let make_bytes l = let b = Bytes.create (List.length l) in
   List.iteri (fun i v -> Bytes.set_uint8 b i v) l; b

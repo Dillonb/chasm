@@ -324,7 +324,7 @@ let inc_success () = num_success := !num_success + 1
 let safe_assemble instruction =
   let do_assemble instruction =
     let b = new chasm_block in
-      b#append instruction; b#as_int_list in
+      b#append_instruction instruction; b#as_int_list in
   try Ok(do_assemble instruction) with
   | ex -> Error ex
 let safe_disassemble asm =
@@ -417,3 +417,17 @@ let expected = "0000000000000000 push rax\n\
     b#push (imm32_i 0xABCDEF);
     let actual = (Capstone.disassemble_all b#as_bytes) in
       if (actual <> expected) then (print_endline ("Actual:\n" ^ actual ^ "\nExpected:\n" ^ expected); raise (Failure (Printf.sprintf "jmp to label test failed. Expected:\n[%s]\nActual:\n[%s]\n" expected actual))) else ()
+(* let one = 1 *)
+(* let two = 2 *)
+  let () =
+    let b = new chasm_block in
+        b#append [%chasm {|
+          push rbp
+          push rbx
+          push r12
+          push r13
+          push r14
+          push r15
+          sub rsp, 8
+        |}];
+        print_endline (Capstone.disassemble_all b#as_bytes)

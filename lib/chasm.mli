@@ -74,6 +74,11 @@ val rw: int -> [> `r16 of r16]
 val rd: int -> [> `r32 of r32]
 val rq: int -> [> `r64 of r64]
 
+val rb_notag: int -> r8
+val rw_notag: int -> r16
+val rd_notag: int -> r32
+val rq_notag: int -> r64
+
 val imm:   int   -> [> `imm   of int]
 val imm8:  int8  -> [> `imm8  of int8]
 val imm8_i: int  -> [> `imm8  of int8]
@@ -88,6 +93,54 @@ val imm32_i: int -> [> `imm32 of int32]
 val uimm32: uint32 -> [> `uimm32 of uint32]
 val uimm32_i: int -> [> `uimm32 of uint32]
 val imm64: int64 -> [> `imm64 of int64]
+
+(** [reg] *)
+val byte_ptr_of_r64: [`r64 of r64 ] -> [> `mem8 of mem ]
+
+(** [reg + reg] *)
+val byte_ptr_of_r64_plus_r64: [ `r64 of r64 ] -> [ `r64 of r64 ] -> [> `mem8 of mem ]
+
+(** [reg + reg * scale] *)
+val byte_ptr_of_r64_plus_r64_scaled: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> [> `mem8 of mem ]
+
+(** [reg * scale] *)
+val byte_ptr_of_r64_scaled: [ `r64 of r64 ] -> int -> [> `mem8 of mem ]
+
+(** [reg + offset] *)
+val byte_ptr_of_r64_plus_offset: [`r64 of r64 ] -> int -> [> `mem8 of mem ]
+
+(** [reg + reg + offset] *)
+val byte_ptr_of_r64_plus_r64_plus_offset: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> [> `mem8 of mem ]
+
+(** [reg + reg * scale + offset] *)
+val byte_ptr_of_r64_plus_r64_scaled_plus_offset: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> int -> [> `mem8 of mem ]
+
+(** [reg * scale + offset] *)
+val byte_ptr_of_r64_scaled_plus_offset: [ `r64 of r64 ] -> int -> int -> [> `mem8 of mem ]
+
+(** [reg] *)
+val byte_ptr_of_r32: [`r32 of r32 ] -> [> `mem8 of mem ]
+
+(** [reg + reg] *)
+val byte_ptr_of_r32_plus_r32: [ `r32 of r32 ] -> [ `r32 of r32 ] -> [> `mem8 of mem ]
+
+(** [reg + reg * scale] *)
+val byte_ptr_of_r32_plus_r32_scaled: [ `r32 of r32 ] -> [ `r32 of r32 ] -> int -> [> `mem8 of mem ]
+
+(** [reg * scale] *)
+val byte_ptr_of_r32_scaled: [ `r32 of r32 ] -> int -> [> `mem8 of mem ]
+
+(** [reg + offset] *)
+val byte_ptr_of_r32_plus_offset: [`r32 of r32 ] -> int -> [> `mem8 of mem ]
+
+(** [reg + reg + offset] *)
+val byte_ptr_of_r32_plus_r32_plus_offset: [ `r32 of r32 ] -> [ `r32 of r32 ] -> int -> [> `mem8 of mem ]
+
+(** [reg + reg * scale + offset] *)
+val byte_ptr_of_r32_plus_r32_scaled_plus_offset: [ `r32 of r32 ] -> [ `r32 of r32 ] -> int -> int -> [> `mem8 of mem ]
+
+(** [reg * scale + offset] *)
+val byte_ptr_of_r32_scaled_plus_offset: [ `r32 of r32 ] -> int -> int -> [> `mem8 of mem ]
 
 (** [reg] *)
 val word_ptr_of_r64: [`r64 of r64 ] -> [> `mem16 of mem ]
@@ -114,30 +167,6 @@ val word_ptr_of_r64_plus_r64_scaled_plus_offset: [ `r64 of r64 ] -> [ `r64 of r6
 val word_ptr_of_r64_scaled_plus_offset: [ `r64 of r64 ] -> int -> int -> [> `mem16 of mem ]
 
 (** [reg] *)
-val qword_ptr_of_r64: [`r64 of r64 ] -> [> `mem64 of mem ]
-
-(** [reg + reg] *)
-val qword_ptr_of_r64_plus_r64: [ `r64 of r64 ] -> [ `r64 of r64 ] -> [> `mem64 of mem ]
-
-(** [reg + reg * scale] *)
-val qword_ptr_of_r64_plus_r64_scaled: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> [> `mem64 of mem ]
-
-(** [reg * scale] *)
-val qword_ptr_of_r64_scaled: [ `r64 of r64 ] -> int -> [> `mem64 of mem ]
-
-(** [reg + offset] *)
-val qword_ptr_of_r64_plus_offset: [`r64 of r64 ] -> int -> [> `mem64 of mem ]
-
-(** [reg + reg + offset] *)
-val qword_ptr_of_r64_plus_r64_plus_offset: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> [> `mem64 of mem ]
-
-(** [reg + reg * scale + offset] *)
-val qword_ptr_of_r64_plus_r64_scaled_plus_offset: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> int -> [> `mem64 of mem ]
-
-(** [reg * scale + offset] *)
-val qword_ptr_of_r64_scaled_plus_offset: [ `r64 of r64 ] -> int -> int -> [> `mem64 of mem ]
-
-(** [reg] *)
 val word_ptr_of_r32: [`r32 of r32 ] -> [> `mem16 of mem ]
 
 (** [reg + reg] *)
@@ -160,6 +189,78 @@ val word_ptr_of_r32_plus_r32_scaled_plus_offset: [ `r32 of r32 ] -> [ `r32 of r3
 
 (** [reg * scale + offset] *)
 val word_ptr_of_r32_scaled_plus_offset: [ `r32 of r32 ] -> int -> int -> [> `mem16 of mem ]
+
+(** [reg] *)
+val dword_ptr_of_r64: [`r64 of r64 ] -> [> `mem32 of mem ]
+
+(** [reg + reg] *)
+val dword_ptr_of_r64_plus_r64: [ `r64 of r64 ] -> [ `r64 of r64 ] -> [> `mem32 of mem ]
+
+(** [reg + reg * scale] *)
+val dword_ptr_of_r64_plus_r64_scaled: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> [> `mem32 of mem ]
+
+(** [reg * scale] *)
+val dword_ptr_of_r64_scaled: [ `r64 of r64 ] -> int -> [> `mem32 of mem ]
+
+(** [reg + offset] *)
+val dword_ptr_of_r64_plus_offset: [`r64 of r64 ] -> int -> [> `mem32 of mem ]
+
+(** [reg + reg + offset] *)
+val dword_ptr_of_r64_plus_r64_plus_offset: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> [> `mem32 of mem ]
+
+(** [reg + reg * scale + offset] *)
+val dword_ptr_of_r64_plus_r64_scaled_plus_offset: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> int -> [> `mem32 of mem ]
+
+(** [reg * scale + offset] *)
+val dword_ptr_of_r64_scaled_plus_offset: [ `r64 of r64 ] -> int -> int -> [> `mem32 of mem ]
+
+(** [reg] *)
+val dword_ptr_of_r32: [`r32 of r32 ] -> [> `mem32 of mem ]
+
+(** [reg + reg] *)
+val dword_ptr_of_r32_plus_r32: [ `r32 of r32 ] -> [ `r32 of r32 ] -> [> `mem32 of mem ]
+
+(** [reg + reg * scale] *)
+val dword_ptr_of_r32_plus_r32_scaled: [ `r32 of r32 ] -> [ `r32 of r32 ] -> int -> [> `mem32 of mem ]
+
+(** [reg * scale] *)
+val dword_ptr_of_r32_scaled: [ `r32 of r32 ] -> int -> [> `mem32 of mem ]
+
+(** [reg + offset] *)
+val dword_ptr_of_r32_plus_offset: [`r32 of r32 ] -> int -> [> `mem32 of mem ]
+
+(** [reg + reg + offset] *)
+val dword_ptr_of_r32_plus_r32_plus_offset: [ `r32 of r32 ] -> [ `r32 of r32 ] -> int -> [> `mem32 of mem ]
+
+(** [reg + reg * scale + offset] *)
+val dword_ptr_of_r32_plus_r32_scaled_plus_offset: [ `r32 of r32 ] -> [ `r32 of r32 ] -> int -> int -> [> `mem32 of mem ]
+
+(** [reg * scale + offset] *)
+val dword_ptr_of_r32_scaled_plus_offset: [ `r32 of r32 ] -> int -> int -> [> `mem32 of mem ]
+
+(** [reg] *)
+val qword_ptr_of_r64: [`r64 of r64 ] -> [> `mem64 of mem ]
+
+(** [reg + reg] *)
+val qword_ptr_of_r64_plus_r64: [ `r64 of r64 ] -> [ `r64 of r64 ] -> [> `mem64 of mem ]
+
+(** [reg + reg * scale] *)
+val qword_ptr_of_r64_plus_r64_scaled: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> [> `mem64 of mem ]
+
+(** [reg * scale] *)
+val qword_ptr_of_r64_scaled: [ `r64 of r64 ] -> int -> [> `mem64 of mem ]
+
+(** [reg + offset] *)
+val qword_ptr_of_r64_plus_offset: [`r64 of r64 ] -> int -> [> `mem64 of mem ]
+
+(** [reg + reg + offset] *)
+val qword_ptr_of_r64_plus_r64_plus_offset: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> [> `mem64 of mem ]
+
+(** [reg + reg * scale + offset] *)
+val qword_ptr_of_r64_plus_r64_scaled_plus_offset: [ `r64 of r64 ] -> [ `r64 of r64 ] -> int -> int -> [> `mem64 of mem ]
+
+(** [reg * scale + offset] *)
+val qword_ptr_of_r64_scaled_plus_offset: [ `r64 of r64 ] -> int -> int -> [> `mem64 of mem ]
 
 (** [reg] *)
 val qword_ptr_of_r32: [ `r32 of r32 ] -> [> `mem64 of mem ]
@@ -186,20 +287,21 @@ val qword_ptr_of_r32_plus_r32_scaled_plus_offset: [ `r32 of r32 ] -> [ `r32 of r
 val qword_ptr_of_r32_scaled_plus_offset: [ `r32 of r32 ] -> int -> int -> [> `mem64 of mem ]
 
 
-val push: push_type -> instruction
+val push: arg -> instruction
 
 val to_label : string -> [> `short_label of string ]
 val to_label_long : string -> [> `long_label of string ]
-val jmp: jmp_type -> instruction
-val sub: sub_arg1_type -> sub_arg2_type -> instruction
+val jmp: arg -> instruction
+val sub: arg -> arg -> instruction
 
 class chasm_block : object
-  method append : Chasm_types.instruction -> unit
+  method append_instruction : Chasm_types.instruction -> unit
+  method append : Chasm_types.asm_line list -> unit
   method has_unbound_labels: bool
   method as_int_list : int list
   method as_bytes : bytes
-  method jmp : Chasm_types.jmp_type -> unit
+  method jmp : Chasm_types.arg -> unit
   method label : string -> unit
-  method push : Chasm_types.push_type -> unit
-  method sub : Chasm_types.sub_arg1_type -> Chasm_types.sub_arg2_type -> unit
+  method push : Chasm_types.arg -> unit
+  method sub : Chasm_types.arg -> Chasm_types.arg -> unit
 end

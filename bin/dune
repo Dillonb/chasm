@@ -1,4 +1,5 @@
 (executable
+ (package chasm)
  (public_name chasm)
  (name main)
  (libraries chasm))

@@ -10,4 +10,5 @@
 (test
  (name test_chasm)
  (modules test_chasm test_utils)
+ (preprocess (pps chasm_ppx))
  (libraries chasm capstone))

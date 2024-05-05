@@ -4,3 +4,16 @@
  (modules chasm chasm_types chasm_util chasm_exceptions)
  (libraries stdint)
  (modules_without_implementation chasm_types))
+
+(menhir
+ (modules x64_parser))
+
+(ocamllex x64_lexer)
+
+(library
+ (name chasm_ppx)
+ (public_name chasm_ppx)
+ (kind ppx_rewriter)
+ (libraries ppxlib chasm)
+ (preprocess (pps ppxlib.metaquot))
+ (modules chasm_ppx x64_parser x64_lexer))
