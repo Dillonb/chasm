@@ -1,6 +1,7 @@
 {
 open Lexing
 open X64_parser
+open Stdint
 
 exception SyntaxError of string
 }
@@ -21,8 +22,12 @@ rule read =
     parse
     | whitespace { read lexbuf }
     | newline    { new_line lexbuf; read lexbuf }
-    | int        { INT (int_of_string (lexeme lexbuf)) }
-    | hex        { INT (int_of_string (lexeme lexbuf)) }
+    | int        { match Uint64.of_string (lexeme lexbuf) with
+                      | i when i > (Uint64.of_int32 (Int32.max_int)) -> INT64 i
+                      | i -> INT (Uint64.to_int i) }
+    | hex        { match Uint64.of_string (lexeme lexbuf) with
+                      | i when i > (Uint64.of_uint32 (Uint32.max_int)) -> INT64 i
+                      | i -> INT (Uint64.to_int i) }
     | eof        { EOF }
 
     | '[' { OPEN_BRACKET }
@@ -121,6 +126,8 @@ rule read =
     | "push" { PUSH }
     | "sub"  { SUB }
     | "jmp"  { JMP }
+    | "add"  { ADD }
+    | "mov"  { MOV }
 
     | identifier { IDENTIFIER (lexeme lexbuf) }
     (* | anything { OCAML_CODE (lexeme lexbuf) } *)

@@ -92,7 +92,7 @@ val imm32: int32 -> [> `imm32 of int32]
 val imm32_i: int -> [> `imm32 of int32]
 val uimm32: uint32 -> [> `uimm32 of uint32]
 val uimm32_i: int -> [> `uimm32 of uint32]
-val imm64: int64 -> [> `imm64 of int64]
+val imm64: uint64 -> [> `imm64 of uint64]
 
 (** [reg] *)
 val byte_ptr_of_r64: [`r64 of r64 ] -> [> `mem8 of mem ]

@@ -24,7 +24,7 @@ type mem =
 type arg = [ `r8 of r8 | `r16 of r16 | `r32 of r32 | `r64 of r64 
            | `mem8 of mem | `mem16 of mem | `mem32 of mem | `mem64 of mem
            | `uimm8 of uint8 | `uimm16 of uint16 | `uimm32 of uint32
-           | `imm8 of int8 | `imm16 of int16 | `imm32 of int32 | `imm of int | `imm_runtime of string
+           | `imm8 of int8 | `imm16 of int16 | `imm32 of int32 | `imm64 of uint64 | `imm of int | `imm_runtime of string | `imm64_runtime of string
            | `long_label of string | `short_label of string ]
 
 type instruction =
@@ -32,6 +32,7 @@ type instruction =
     (* Note: far jumps are not supported *)
     | Jmp of arg
     | Sub of arg*arg
+    | Mov of arg*arg
 
 
 type asm_line =

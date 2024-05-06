@@ -85,6 +85,9 @@ let list_of_int16_le x = list_of_int16_le_i (Int16.to_int x)
 let list_of_uint16_le x = list_of_uint16_le_i (Uint16.to_int x)
 let list_of_int32_le x = list_of_int32_le_i (Int32.to_int x)
 let list_of_uint32_le x = list_of_uint32_le_i (Uint32.to_int x)
+let list_of_uint64_le x = 
+  let shiftmask i shift_amount = Uint64.to_int (Uint64.logand (Uint64.shift_right_logical i shift_amount) (Uint64.of_int 0xFF)) in
+  List.map (fun shift_amount -> shiftmask x shift_amount) [ 0; 8; 16; 24; 32; 40; 48; 56 ]
 
 let int_of_bool b = if b then 1 else 0
 let make_rex w r x b = let low_bits =
@@ -127,6 +130,7 @@ let is_uniform_byte_reg = function
 let make_rex_reg = function
   | `r8 r when (is_uniform_byte_reg (`r8 r))-> Some 0x40
   | `r8 r when (rb_to_int (`r8 r) >= 8)-> (Some rex_b)
+  | `r64 r when (rq_to_int (`r64 r) >= 8)-> (Some rex_b)
   | _ -> None
 
 let combine_rex rex1 rex2 = match rex1, rex2 with

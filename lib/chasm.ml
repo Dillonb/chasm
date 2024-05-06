@@ -234,11 +234,14 @@ let rec assemble instruction instruction_offset labels = match instruction with
   | Sub(`r64 r, `imm i) when is_int8  i -> Complete ((assemble_modrm_reg_op (Some rex_w) 0x83 5 (`r64 r)) @ [i])
 
   (* todo: remove sized imm parameters entirely *)
-  | Sub(arg, `uimm8 i)  -> assemble (Sub(arg, `imm (Uint8.to_int i))) instruction_offset labels
+  | Sub(arg, `uimm8 i)  -> assemble (Sub(arg, `imm (Uint8.to_int i)))  instruction_offset labels
   | Sub(arg, `uimm16 i) -> assemble (Sub(arg, `imm (Uint16.to_int i))) instruction_offset labels
   | Sub(arg, `uimm32 i) -> assemble (Sub(arg, `imm (Uint32.to_int i))) instruction_offset labels
-  | Sub(arg, `imm32 i)  -> assemble (Sub(arg, `imm (Int32.to_int i))) instruction_offset labels
+  | Sub(arg, `imm32 i)  -> assemble (Sub(arg, `imm (Int32.to_int i)))  instruction_offset labels
   | Sub(_) -> raise (Not_implemented "Invalid or unhandled sub encoding")
+
+  | Mov(`r64 r, `imm64 i) -> Complete ((combine_rex (Some rex_w) (make_rex_reg (`r64 r))) +? (0xB8 + ((r64_to_int r) land 7) :: (list_of_uint64_le i)))
+  | Mov(_) -> raise (Not_implemented "Invalid or unhandled mov encoding")
 
 let offset_of_int = function
       | o when o == 0 -> None

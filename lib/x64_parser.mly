@@ -1,5 +1,6 @@
 %token <string> IDENTIFIER
 %token <int> INT
+%token <Stdint.uint64> INT64
 
 %token OPEN_BRACKET
 %token CLOSE_BRACKET
@@ -25,6 +26,9 @@
 %token PUSH
 %token SUB
 %token JMP
+%token ADD
+%token MOV
+
 %token AL
 %token CL
 %token DL
@@ -283,6 +287,10 @@ immediate:
     | DOLLAR_SIGN; i = IDENTIFIER {(`imm_runtime i)}
     | DOLLAR_SIGN; OPEN_BRACE; i = IDENTIFIER; CLOSE_BRACE {(`imm_runtime i)}
 
+immediate_64:
+    | i = INT64 {(`imm64 i)}
+    (* TODO - imm64_runtime as above*)
+
 instruction:
     | PUSH; r = r16 {Chasm__Chasm_types.Push (`r16 r)}
     | PUSH; r = r64 {Chasm__Chasm_types.Push (`r64 r)}
@@ -313,6 +321,8 @@ instruction:
     | SUB; a = dword_ptr; COMMA; r = r32; {Chasm__Chasm_types.Sub(a, `r32 r)}
     | SUB; a = qword_ptr; COMMA; r = r64; {Chasm__Chasm_types.Sub(a, `r64 r)}
 
+    | MOV; r = r64; COMMA; i = immediate    {Chasm__Chasm_types.Mov(`r64 r, i)}
+    | MOV; r = r64; COMMA; i = immediate_64 {Chasm__Chasm_types.Mov(`r64 r, i)}
 line:
     | name = IDENTIFIER; COLON { Chasm__Chasm_types.Label name }
     | i = instruction {Chasm__Chasm_types.Instruction i}

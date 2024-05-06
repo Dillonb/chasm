@@ -1,5 +1,6 @@
 open Ppxlib
 open Chasm__Chasm_types
+open Stdint
 
 let assemble asm_str =
     let lexbuf = Lexing.from_string asm_str in
@@ -138,7 +139,6 @@ let expr_of_imm ~loc i = match i with
   | `imm8 i -> [%expr Stdint.Int8.of_int([%e expr_of_int (Stdint.Int8.to_int(i))])]
   | `imm16 i -> [%expr Stdint.Int16.of_int([%e expr_of_int (Stdint.Int16.to_int(i))])]
   | `imm32 i -> [%expr Stdint.Int32.of_int([%e expr_of_int (Stdint.Int32.to_int(i))])]
-  | `imm64 i -> [%expr Stdint.Int64.of_int([%e expr_of_int (Stdint.Int64.to_int(i))])]
   | `imm i -> [%expr `imm [%e expr_of_int i]]
 let expr_of_imm_option ~loc i = expr_of_option ~loc expr_of_imm i
 
@@ -193,15 +193,18 @@ let expr_of_arg ~loc arg = match arg with
   | `imm8 _ -> raise (Invalid_argument "`imm8 unimplemented in expr_of_arg")
   | `imm16 _ -> raise (Invalid_argument "`imm16 unimplemented in expr_of_arg")
   | `imm32 _ -> raise (Invalid_argument "`imm32 unimplemented in expr_of_arg")
+  | `imm64 i -> [%expr `imm64 (Uint64.of_string [%e Ast_builder.Default.estring ~loc (Uint64.to_string_hex i)] )]
   | `imm i -> expr_of_imm ~loc (`imm i)
   | `imm_runtime expr -> [%expr `imm [%e Parse.expression (Lexing.from_string expr) ]]
+  | `imm64_runtime _ -> raise (Invalid_argument "`imm64_runtime unimplemented in expr_of_arg")
   | `long_label l -> Parse.expression (Lexing.from_string ("`long_label \"" ^ l ^ "\""))
   | `short_label l -> Parse.expression (Lexing.from_string ("`short_label \"" ^ l ^ "\""))
 
 let expr_of_instruction ~loc i = match i with
   | Push arg -> [%expr Push [%e expr_of_arg ~loc arg]]
-  | Jmp arg -> [%expr Jmp [%e expr_of_arg ~loc arg]]
+  | Jmp  arg -> [%expr Jmp [%e expr_of_arg ~loc arg]]
   | Sub (arg1,arg2) -> [%expr Sub ([%e expr_of_arg ~loc arg1], [%e expr_of_arg ~loc arg2])]
+  | Mov (arg1,arg2) -> [%expr Mov ([%e expr_of_arg ~loc arg1], [%e expr_of_arg ~loc arg2])]
 
 let expr_of_asm_line ~loc line = match line with
   | Instruction i -> [%expr Instruction [%e expr_of_instruction ~loc i ]]
