@@ -44,8 +44,7 @@ let is_int8 x =
 let is_uint8 x =
   let min = Uint8.to_int Uint8.min_int in
   let max = Uint8.to_int Uint8.max_int in
-  let result = ((x >= min) && (x <= max)) in
-    print_endline ((string_of_int x) ^ "is a uint8? " ^ (string_of_bool result)); result
+    ((x >= min) && (x <= max))
 
 let is_int16 x =
   let min = Int16.to_int Int16.min_int in
