@@ -123,11 +123,12 @@ rule read =
     | "r14" { R14 }
     | "r15" { R15 }
 
-    | "push" { PUSH }
-    | "sub"  { SUB }
-    | "jmp"  { JMP }
-    | "add"  { ADD }
-    | "mov"  { MOV }
+    | "push"   { PUSH }
+    | "sub"    { SUB }
+    | "jmp"    { JMP }
+    | "add"    { ADD }
+    | "mov"    { MOV }
+    | "mov64"  { MOV64 }
 
     | identifier { IDENTIFIER (lexeme lexbuf) }
     (* | anything { OCAML_CODE (lexeme lexbuf) } *)

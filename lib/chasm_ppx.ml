@@ -196,7 +196,7 @@ let expr_of_arg ~loc arg = match arg with
   | `imm64 i -> [%expr `imm64 (Uint64.of_string [%e Ast_builder.Default.estring ~loc (Uint64.to_string_hex i)] )]
   | `imm i -> expr_of_imm ~loc (`imm i)
   | `imm_runtime expr -> [%expr `imm [%e Parse.expression (Lexing.from_string expr) ]]
-  | `imm64_runtime _ -> raise (Invalid_argument "`imm64_runtime unimplemented in expr_of_arg")
+  | `imm64_runtime expr -> [%expr `imm64 [%e Parse.expression (Lexing.from_string expr) ]]
   | `long_label l -> Parse.expression (Lexing.from_string ("`long_label \"" ^ l ^ "\""))
   | `short_label l -> Parse.expression (Lexing.from_string ("`short_label \"" ^ l ^ "\""))
 

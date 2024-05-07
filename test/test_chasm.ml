@@ -420,6 +420,7 @@ let expected = "0000000000000000 push rax\n\
 (* let one = 1 *)
 (* let two = 2 *)
   let () =
+    let some_uint64 = (Uint64.of_string "0xFFFFFFFFFFFFFFFF") in
     let b = new chasm_block in
         b#append [%chasm {|
           push rbp
@@ -429,5 +430,7 @@ let expected = "0000000000000000 push rax\n\
           push r14
           push r15
           sub rsp, 8
+          mov64 r12, ${some_uint64}
         |}];
+
         print_endline (Capstone.disassemble_all b#as_bytes)
